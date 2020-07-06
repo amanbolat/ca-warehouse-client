@@ -6,18 +6,18 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-func GoMod() error {
+func Mod() error {
 	return sh.Run("go", "mod", "download")
 }
 
+func Generate() error {
+	return sh.Run("go", "generate", "./...")
+}
+
 func Run() error {
-	if err := GoMod(); err != nil {
+	if err := Mod(); err != nil {
 		return err
 	}
 
 	return sh.Run("go", "run", "./cmd/main.go")
-}
-
-func Mod() error {
-	return sh.Run("go", "mod", "download")
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"gopkg.in/olahol/melody.v1"
+	"net/http"
 	"os"
 	"os/signal"
 	"time"
@@ -31,9 +32,17 @@ func NewServer(config config.Config) Server {
 	m := NewBroadcaster()
 	a := API{entryStore: entryStore, shipmentStore: shipmentStore, wsServer: m}
 
-	g := e.Group("/api", middleware.Logger(), middleware.Recover())
+	e.Use(middleware.Logger(), middleware.Recover(), middleware.CORSWithConfig(middleware.CORSConfig{
+		Skipper:          middleware.DefaultSkipper,
+		AllowOrigins:     []string{"http://localhost:8080"},
+		AllowMethods:     []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
+		AllowCredentials: true,
+	}))
+
+	g := e.Group("/api")
 	g.GET("/entries", a.GetEntryList)
-	g.GET("/entries/{}", a.GetEntrySingle)
+	g.GET("/entries/:id", a.GetEntrySingle)
+	g.POST("/entries/:id/print_barcode", a.PrintEntryBarcode)
 	g.POST("/entries", a.CreateEntry)
 	g.PUT("/entries", a.EditEntry)
 	g.GET("/shipments", a.GetShipmentList)
