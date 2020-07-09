@@ -3,8 +3,11 @@ package filemaker
 import (
 	"encoding/json"
 	"github.com/amanbolat/ca-warehouse-client/api"
+	"github.com/amanbolat/ca-warehouse-client/filemaker/fmutil"
 	"github.com/amanbolat/ca-warehouse-client/warehouse"
 	fm "github.com/amanbolat/gofmcon"
+	"github.com/pkg/errors"
+	"strconv"
 )
 
 const (
@@ -37,7 +40,7 @@ func (s *EntryStore) GetEntryById(id string) (warehouse.Entry, error) {
 		fm.FMQueryField{Name: "id", Value: id, Op: fm.Equal},
 	)
 
-	rec, err := GetFileMakerRecordSingle(s, q)
+	rec, err := fmutil.GetFileMakerRecordSingle(s, q)
 
 	if err != nil {
 		return warehouse.Entry{}, err
@@ -49,6 +52,7 @@ func (s *EntryStore) GetEntryById(id string) (warehouse.Entry, error) {
 		return warehouse.Entry{}, err
 	}
 	err = json.Unmarshal(b, &fEntry)
+	fEntry.FMRecordID = rec.ID
 	if err != nil {
 		return warehouse.Entry{}, err
 	}
@@ -76,7 +80,7 @@ func (s *EntryStore) GetEntryList(meta api.RequestMeta) ([]warehouse.Entry, api.
 			Op:    fm.Equal,
 		},
 	)
-	recs, resMeta, err := GetFileMakerRecordList(s, q, meta)
+	recs, resMeta, err := fmutil.GetFileMakerRecordList(s, q, meta)
 	if err != nil {
 		return nil, resMeta, err
 	}
@@ -93,6 +97,7 @@ func (s *EntryStore) GetEntryList(meta api.RequestMeta) ([]warehouse.Entry, api.
 		if err != nil {
 			return nil, resMeta, err
 		}
+		entry.FMRecordID = rec.ID
 		fEntries = append(fEntries, entry)
 	}
 
@@ -102,4 +107,42 @@ func (s *EntryStore) GetEntryList(meta api.RequestMeta) ([]warehouse.Entry, api.
 	}
 
 	return entries, resMeta, err
+}
+
+func (s *EntryStore) CreateEntry(e warehouse.Entry) (warehouse.Entry, error) {
+	q := fm.NewFMQuery(s.databaseName, ENTRY_LAYOUT, fm.New)
+	q.WithFields(
+		fm.FMQueryField{Name: "CustomerCode", Value: e.CustomerCode},
+		fm.FMQueryField{Name: "SourceOfEntry", Value: e.Source},
+		fm.FMQueryField{Name: "TrackCode", Value: e.TrackCode},
+		fm.FMQueryField{Name: "QuantityOfBoxes", Value: strconv.Itoa(e.BoxQty)},
+		fm.FMQueryField{Name: "PieceQuantity", Value: strconv.Itoa(e.PcsQty)},
+		fm.FMQueryField{Name: "ProductName", Value: e.ProductName},
+		fm.FMQueryField{Name: "Warehouse", Value: e.Warehouse},
+		fm.FMQueryField{Name: "is_found_for_shipment", Value: strconv.Itoa(fmutil.ConvertBoolToInt(e.IsFoundForShipment))},
+		fm.FMQueryField{Name: "has_brand", Value: strconv.Itoa(fmutil.ConvertBoolToInt(e.HasBrand))},
+		fm.FMQueryField{Name: "product_category", Value: string(e.ProductCategory)},
+	)
+
+	fmSet, err := s.conn.Query(q)
+	if err != nil {
+		return warehouse.Entry{}, errors.WithMessage(err, "could not create new entry")
+	}
+
+	resEntry := warehouse.Entry{}
+	if len(fmSet.Resultset.Records) < 1 {
+		return warehouse.Entry{}, errors.New("new entry might be created, but no result was returned from database")
+	}
+
+	b, err := fmSet.Resultset.Records[0].JsonFields()
+	if err != nil {
+		return warehouse.Entry{}, err
+	}
+
+	err = json.Unmarshal(b, &resEntry)
+	if err != nil {
+		return warehouse.Entry{}, err
+	}
+
+	return resEntry, nil
 }

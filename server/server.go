@@ -9,6 +9,7 @@ import (
 	"github.com/amanbolat/gofmcon"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/patrickmn/go-cache"
 	"gopkg.in/olahol/melody.v1"
 	"net/http"
 	"os"
@@ -28,9 +29,16 @@ func NewServer(config config.Config) Server {
 	conn := gofmcon.NewFMConnector(config.FmHost, "", config.FmUser, config.FmPass)
 	entryStore := filemaker.NewEntryStore(conn, config.FmDatabaseName)
 	shipmentStore := filemaker.NewShipmentStore(conn, config.FmDatabaseName)
+	customerStore := filemaker.NewCustomerStore(conn, config.FmDatabaseName)
 
 	m := NewBroadcaster()
-	a := API{entryStore: entryStore, shipmentStore: shipmentStore, wsServer: m}
+	a := API{
+		entryStore:    entryStore,
+		shipmentStore: shipmentStore,
+		customerStore: customerStore,
+		wsServer:      m,
+		memCache:      cache.New(time.Minute*5, time.Minute*7),
+	}
 
 	e.Use(middleware.Logger(), middleware.Recover(), middleware.CORSWithConfig(middleware.CORSConfig{
 		Skipper:          middleware.DefaultSkipper,
@@ -46,6 +54,7 @@ func NewServer(config config.Config) Server {
 	g.POST("/entries", a.CreateEntry)
 	g.PUT("/entries", a.EditEntry)
 	g.GET("/shipments", a.GetShipmentList)
+	g.GET("/customers", a.GetCustomerList)
 
 	s := Server{
 		router: e,

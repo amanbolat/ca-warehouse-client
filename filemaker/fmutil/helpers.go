@@ -1,4 +1,4 @@
-package filemaker
+package fmutil
 
 import (
 	"fmt"
@@ -99,4 +99,16 @@ func GetFileMakerRecordSingle(store Store, q *fm.FMQuery) (*fm.Record, error) {
 	}
 
 	return fmSet.Resultset.Records[0], nil
+}
+
+func ConvertToBool(i int) bool {
+	return i == 1
+}
+
+func ConvertBoolToInt(b bool) int {
+	if b {
+		return 1
+	}
+
+	return 0
 }

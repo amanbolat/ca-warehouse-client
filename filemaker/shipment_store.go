@@ -3,6 +3,7 @@ package filemaker
 import (
 	"encoding/json"
 	query "github.com/amanbolat/ca-warehouse-client/api"
+	"github.com/amanbolat/ca-warehouse-client/filemaker/fmutil"
 	"github.com/amanbolat/ca-warehouse-client/logistics"
 	fm "github.com/amanbolat/gofmcon"
 	"github.com/pkg/errors"
@@ -68,7 +69,7 @@ func (r *ShipmentStore) GetShipmentList(meta query.RequestMeta) ([]*logistics.Sh
 			Op:    "=",
 		})
 
-	recs, resMeta, err := GetFileMakerRecordList(r, q, meta)
+	recs, resMeta, err := fmutil.GetFileMakerRecordList(r, q, meta)
 	if err != nil {
 		return nil, resMeta, err
 	}
@@ -98,7 +99,7 @@ func (r *ShipmentStore) GetShipmentByCode(code string) (logistics.Shipment, erro
 		fm.FMQueryField{Name: "code", Value: code, Op: fm.Equal},
 	)
 
-	rec, err := GetFileMakerRecordSingle(r, q)
+	rec, err := fmutil.GetFileMakerRecordSingle(r, q)
 	if err != nil {
 		return logistics.Shipment{}, err
 	}

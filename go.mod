@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/amanbolat/gofmcon v0.3.3
 	github.com/boombuler/barcode v1.0.0
+	github.com/davecgh/go-spew v1.1.1
 	github.com/fogleman/gg v1.3.0
 	github.com/gobuffalo/packr/v2 v2.8.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
@@ -14,6 +15,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.1.16
 	github.com/magefile/mage v1.9.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rogpeppe/go-internal v1.6.0 // indirect
 	github.com/rs/xid v1.2.1
