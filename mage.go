@@ -43,7 +43,7 @@ func BuildImage() error {
 		return errors.New("Some files are not committed, can't build docker image")
 	}
 
-	gitTag, err := sh.Output("git", "rev-parse", " --short", "HEAD")
+	gitTag, err := sh.Output("git", "rev-parse", "--short", "HEAD")
 	if err != nil {
 		return err
 	}
