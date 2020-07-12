@@ -9,17 +9,31 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"time"
 )
 
+type KDNiaoConfig struct {
+	KdnBusinessId string `split_words:"true" required:"true"`
+	KdnApiSecret  string `split_words:"true" required:"true"`
+}
+
 type KDNiaoApi struct {
-	BusinessId string
-	ApiSecret  string
-	httpC      *http.Client
+	KDNiaoConfig
+	httpC *http.Client
+}
+
+func NewKDNiaoApi(config KDNiaoConfig) *KDNiaoApi {
+	return &KDNiaoApi{
+		KDNiaoConfig: config,
+		httpC: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+	}
 }
 
 // Hashed api secret and data to be used as authentication token
 func (kd KDNiaoApi) SignedRequest(req []byte) string {
-	str := string(req) + kd.ApiSecret
+	str := string(req) + kd.KdnApiSecret
 	hash := md5.Sum([]byte(str))
 
 	signedData := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%x", hash)))
@@ -33,7 +47,7 @@ func (kd KDNiaoApi) GetSourceByTrack(code string) (*SourceResponse, error) {
 
 	jsonReq, _ := json.Marshal(reqData)
 	reqStr := "http://api.kdniao.com/Ebusiness/EbusinessOrderHandle.aspx?EBusinessID=%s&DataType=%d&DataSign=%s&RequestType=%d&RequestData=%s"
-	reqUrl := fmt.Sprintf(reqStr, kd.BusinessId, 2, url.QueryEscape(kd.SignedRequest(jsonReq)), 2002, url.QueryEscape(string(jsonReq)))
+	reqUrl := fmt.Sprintf(reqStr, kd.KdnBusinessId, 2, url.QueryEscape(kd.SignedRequest(jsonReq)), 2002, url.QueryEscape(string(jsonReq)))
 
 	u, err := url.Parse(reqUrl)
 	if err != nil {

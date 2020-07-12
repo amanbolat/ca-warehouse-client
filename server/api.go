@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"github.com/amanbolat/ca-warehouse-client/api"
 	"github.com/amanbolat/ca-warehouse-client/crm"
 	"github.com/amanbolat/ca-warehouse-client/filemaker"
@@ -11,7 +12,7 @@ import (
 	"github.com/patrickmn/go-cache"
 	"gopkg.in/olahol/melody.v1"
 	"net/http"
-	"os/exec"
+	"strconv"
 )
 
 type JSONResponse struct {
@@ -25,6 +26,9 @@ type API struct {
 	customerStore *filemaker.CustomerStore
 	wsServer      *melody.Melody
 	memCache      *cache.Cache
+	kdniaoApi     *api.KDNiaoApi
+	printer       printing.Printer
+	labelManager  printing.LabelManager
 }
 
 func (a API) GetEntryList(c echo.Context) error {
@@ -36,6 +40,9 @@ func (a API) GetEntryList(c echo.Context) error {
 	}
 
 	meta = warehouse.MapEntryFields(meta)
+	meta.InternalFilter["Warehouse"] = "=GZWH2"
+	meta.InternalFilter["Id_shipmentNumber"] = "="
+	meta.InternalFilter["is_utilized"] = "="
 
 	entries, res, err := a.entryStore.GetEntryList(meta)
 	if err != nil {
@@ -51,6 +58,21 @@ func (a API) GetEntryList(c echo.Context) error {
 
 func (a API) GetEntrySingle(c echo.Context) error {
 	return nil
+}
+
+func (a API) GetShipmentSingle(c echo.Context) error {
+	code := c.Param("code")
+
+	sm, err := a.shipmentStore.GetShipmentByCode(code)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrNotFound
+	}
+
+	return c.JSON(http.StatusOK, JSONResponse{
+		Meta: api.ResponseMeta{Page: 1, Total: 1, Count: 1},
+		Data: sm,
+	})
 }
 
 func (a API) GetShipmentList(c echo.Context) error {
@@ -76,18 +98,15 @@ func (a API) GetShipmentList(c echo.Context) error {
 func (a API) PrintEntryBarcode(c echo.Context) error {
 	entryId := c.Param("id")
 
-	bm := printing.BarcodeManger{}
-
-	bc, err := bm.CreateEntryBarcode(entryId)
+	bc, err := a.labelManager.CreateEntryBarcode(entryId)
 	if err != nil {
 		c.Logger().Error(err)
 		return echo.ErrInternalServerError
 	}
 
-	printCmd := exec.Command("lpr", "-P", "Canon_G3000_series", "-o", "media=a4", "-r", bc.FullPath)
-	out, err := printCmd.CombinedOutput()
+	err = a.printer.PrintFiles(1, "", bc.FullPath)
 	if err != nil {
-		c.Logger().Errorf("%v: %s", err, string(out))
+		c.Logger().Error(err)
 		return echo.ErrInternalServerError
 	}
 
@@ -130,7 +149,93 @@ func (a API) GetCustomerList(c echo.Context) error {
 	})
 }
 
-func (a API) PrintShipmentBarcodes(c echo.Context) error {
+func (a API) GetSourceByTrackCode(c echo.Context) error {
+	trackCode := c.Param("track_code")
+
+	kdniaoResponse, err := a.kdniaoApi.GetSourceByTrack(trackCode)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrNotFound
+	}
+
+	return c.JSON(http.StatusOK, kdniaoResponse)
+}
+
+func (a API) PrintShipmentULLabels(c echo.Context) error {
+	code := c.Param("code")
+
+	copies, _ := strconv.Atoi(c.QueryParam("copies"))
+
+	sm, err := a.shipmentStore.GetShipmentByCode(code)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrNotFound
+	}
+
+	bcs, err := a.labelManager.CreateUnitLoadLabels(sm)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrInternalServerError
+	}
+
+	var paths []string
+	for _, bc := range bcs {
+		paths = append(paths, bc.FullPath)
+	}
+
+	err = a.printer.PrintFiles(copies, "", paths...)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrInternalServerError
+	}
+
+	return c.String(http.StatusOK, "done")
+}
+
+func (a API) PrintShipmentPreparationInfo(c echo.Context) error {
+	code := c.Param("code")
+
+	sm, err := a.shipmentStore.GetShipmentByCode(code)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrNotFound
+	}
+
+	l, err := a.labelManager.CreateShipmentEntriesLabel(sm)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrInternalServerError
+	}
+
+	err = a.printer.PrintFiles(1, "", l.FullPath)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrInternalServerError
+	}
+
+	return c.String(http.StatusOK, "done")
+}
+
+func (a API) PrintShipmentPartnerInfo(c echo.Context) error {
+	code := c.Param("code")
+
+	sm, err := a.shipmentStore.GetShipmentByCode(code)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrNotFound
+	}
+
+	l, err := a.labelManager.CreateShipmentPartnerInfoLabel(sm)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrInternalServerError
+	}
+
+	err = a.printer.PrintFiles(1, "", l.FullPath)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrInternalServerError
+	}
 
 	return c.String(http.StatusOK, "done")
 }
@@ -140,7 +245,23 @@ func (a API) EditEntry(c echo.Context) error {
 }
 
 func (a API) CreateEntry(c echo.Context) error {
-	return nil
+	entry := &warehouse.Entry{}
+	err := c.Bind(entry)
+
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrBadRequest
+	}
+
+	fmt.Println(entry)
+
+	newEntry, err := a.entryStore.CreateEntry(*entry)
+	if err != nil {
+		c.Logger().Error(err)
+		return echo.ErrBadRequest
+	}
+
+	return c.JSON(http.StatusOK, newEntry)
 }
 
 func (a API) ShipmentsWS(c echo.Context) error {

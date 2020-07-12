@@ -21,3 +21,12 @@ func Run() error {
 
 	return sh.Run("go", "run", "./cmd/main.go")
 }
+
+func ClearDist() error {
+	return sh.Run("rm", "-rf", "./dist")
+}
+
+func Build() error {
+	ClearDist()
+	return sh.Run("go", "build", "-ldflags", "-s -w", "-o", "./dist/whclient", "./cmd/main.go")
+}

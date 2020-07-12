@@ -24,9 +24,5 @@ func main() {
 
 	s := server.NewServer(conf)
 
-	port := 11201
-	if conf.Port > 1024 {
-		port = 11201
-	}
-	s.Start(port)
+	s.Start(conf.Port)
 }

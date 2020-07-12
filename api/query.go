@@ -5,14 +5,15 @@ type RequestMeta struct {
 	SortFields []SortField `json:"sort" schema:"sort"`
 	// Requested count of records per page
 	// -1 == all records;
-	PerPage int           `json:"per_page" schema:"per_page"`
-	Skip    int           `json:"-" schema:"-"`
-	Filters []FilterField `json:"filters" schema:"filters"`
+	PerPage        int               `json:"per_page" schema:"per_page"`
+	Skip           int               `json:"-" schema:"-"`
+	Filters        []FilterField     `json:"filter" schema:"filter"`
+	InternalFilter map[string]string `json:"-"`
 }
 
 type FilterField struct {
-	Key   string
-	Value string
+	K string `json:"k"`
+	V string `json:"v"`
 }
 
 // Check method sets page to 1 if it less than 1

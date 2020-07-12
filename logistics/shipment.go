@@ -10,6 +10,7 @@ package logistics
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/amanbolat/ca-warehouse-client/filemaker/fmutil"
 	"github.com/amanbolat/ca-warehouse-client/warehouse"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
@@ -58,48 +59,36 @@ const (
 	Local
 )
 
-type PackageMethod int
-
-func PackageMethodP(i int) *PackageMethod {
-	v := PackageMethod(i)
-	return &v
-}
-
-const (
-	PackageNone PackageMethod = iota
-	PackageBag
-	PackageStandard
-	PackageCarton
-	PackageFoam
-	PackageCartonFoam
-	PackageWoodenCrate
-	PackageWoodenCrateFoam
-	PackageWoodenBox
-	PackageWoodenBoxFoam
-)
-
 type FileMakerShipment struct {
-	ID                     string    `json:"Id_shipment,omitempty"`
-	Code                   string    `json:"code,omitempty"`
-	Type                   int       `json:"CargoType_number,omitempty"`
-	CustomerCode           string    `json:"CustomerCode,omitempty"`
-	PackagesQty            int       `json:"PackageQuantity,omitempty"`
-	PiecesQty              int       `json:"TotalQuanity,omitempty"`
-	CurrentStatusKey       int       `json:"ShipmentStatus_number,omitempty"`
-	TransferPointKey       int       `json:"TransferPoint_number,omitempty"`
-	TransportMethodKey     int       `json:"TransportationMethod_number,omitempty"`
-	PackageMethodKey       int       `json:"PackageMethod_number,omitempty"`
-	DepartureWarehouse     string    `json:"Departure_Warehouse,omitempty"`
-	ArrivalWarehouse       string    `json:"Arrival_Warehouse,omitempty"`
-	TransferPointWarehouse string    `json:"TransferPoint_Warehouse,omitempty"`
-	DateCreated            time.Time `json:"Date_Created,omitempty"`
-	DateModified           time.Time `json:"Date_Modified_Timestamp,omitempty"`
-	// Order values
-	UnitLoads     []*FileMakerUnitLoad        `json:"TO2b_Shipments||ShipmentDetails,omitempty"`
-	Entries       []*warehouse.FileMakerEntry `json:"TO2c_Shipments||Entries,omitempty"`
-	Consolidation []*FileMakerShipment        `json:"TO2k_Shipments||Shipments||Child,omitempty"`
-	FMRecordID    int64                       `json:"-"`
-	ImageUrls     []string                    `json:"Container,omitempty"`
+	ID                               string                      `json:"Id_shipment,omitempty"`
+	Code                             string                      `json:"code,omitempty"`
+	Type                             int                         `json:"CargoType_number,omitempty"`
+	CustomerCode                     string                      `json:"CustomerCode,omitempty"`
+	PackagesQty                      int                         `json:"PackageQuantity,omitempty"`
+	PiecesQty                        int                         `json:"TotalQuanity,omitempty"`
+	CurrentStatusKey                 int                         `json:"ShipmentStatus_number,omitempty"`
+	TransferPointKey                 int                         `json:"TransferPoint_number,omitempty"`
+	TransportMethodKey               int                         `json:"TransportationMethod_number,omitempty"`
+	PackageMethod                    string                      `json:"package_method,omitempty"`
+	PackageMethodZh                  string                      `json:"shipments_package_method::locale_zh,omitempty"`
+	DepartureWarehouse               string                      `json:"Departure_Warehouse,omitempty"`
+	ArrivalWarehouse                 string                      `json:"Arrival_Warehouse,omitempty"`
+	TransferPointWarehouse           string                      `json:"TransferPoint_Warehouse,omitempty"`
+	DateCreated                      time.Time                   `json:"Date_Created,omitempty"`
+	DateModified                     time.Time                   `json:"Date_Modified_Timestamp,omitempty"`
+	UnitLoads                        []*FileMakerUnitLoad        `json:"TO2b_Shipments||ShipmentDetails,omitempty"`
+	Entries                          []*warehouse.FileMakerEntry `json:"TO2c_Shipments||Entries,omitempty"`
+	Consolidation                    []*FileMakerShipment        `json:"TO2k_Shipments||Shipments||Child,omitempty"`
+	FMRecordID                       int64                       `json:"-"`
+	ImageUrls                        []string                    `json:"Container,omitempty"`
+	PartnerCode                      string                      `json:"Partners||PartnerCode"`
+	PartnerProductName               string                      `json:"first_unit_load_product_name"`
+	PartnerRecipientFullName         string                      `json:"Partners||RecipientFullName"`
+	PartnerRecipientPhoneNumber      string                      `json:"Partners||RecipientPhoneNumber"`
+	PartnerRecipientDestinationPoint string                      `json:"Partners||RecipientDestinationPoint"`
+	PartnerTransportationMethod      string                      `json:"partner_transport_method"`
+	PartnerCargoValue                float64                     `json:"Partners||ValuesOfCargo"`
+	NeedDeclare                      int                         `json:"need_declare"`
 }
 
 func (fs FileMakerShipment) ToShipment() Shipment {
@@ -135,7 +124,8 @@ func (fs FileMakerShipment) ToShipment() Shipment {
 		CurrentStatusKey:       ShipmentStatus(fs.CurrentStatusKey),
 		TransferPoint:          transferPoint,
 		TransportMethod:        TransportMethodP(fs.TransportMethodKey),
-		PackageMethod:          PackageMethodP(fs.PackageMethodKey),
+		PackageMethod:          fs.PackageMethod,
+		PackageMethodZh:        fs.PackageMethodZh,
 		DepartureWarehouse:     fs.DepartureWarehouse,
 		ArrivalWarehouse:       fs.ArrivalWarehouse,
 		TransferPointWarehouse: fs.TransferPointWarehouse,
@@ -146,31 +136,45 @@ func (fs FileMakerShipment) ToShipment() Shipment {
 		Consolidation:          consolidatedShipments,
 		FMRecordID:             fs.FMRecordID,
 		ImageUrls:              nil,
+		PartnerInfo: PartnerInfo{
+			Code:           fs.PartnerCode,
+			DeliveryMethod: DeliveryMethod(fs.PartnerTransportationMethod),
+			ProductName:    fs.PartnerProductName,
+			CargoValue:     fs.PartnerCargoValue,
+			Recipient: Recipient{
+				Name:        fs.PartnerRecipientFullName,
+				PhoneNumber: fs.PartnerRecipientPhoneNumber,
+				Destination: fs.PartnerRecipientDestinationPoint,
+			},
+		},
+		NeedDeclare: fmutil.ConvertToBool(fs.NeedDeclare),
 	}
 }
 
 type Shipment struct {
-	ID                     string           `json:"id,omitempty"`
-	Code                   string           `json:"code,omitempty"`
-	Type                   *ShipmentType    `json:"type,omitempty"`
-	CustomerCode           string           `json:"customer_code,omitempty"`
-	PackagesQty            int              `json:"packages_qty,omitempty"`
-	PiecesQty              int              `json:"pieces_qty,omitempty"`
-	CurrentStatusKey       ShipmentStatus   `json:"current_status,omitempty"`
-	TransferPoint          string           `json:"transfer_point,omitempty"`
-	TransportMethod        *TransportMethod `json:"transport_method,omitempty"`
-	PackageMethod          *PackageMethod   `json:"package_method,omitempty"`
-	DepartureWarehouse     string           `json:"departure_warehouse,omitempty"`
-	ArrivalWarehouse       string           `json:"arrival_warehouse,omitempty"`
-	TransferPointWarehouse string           `json:"transfer_point_warehouse,omitempty"`
-	DateCreated            time.Time        `json:"date_created,omitempty"`
-	DateModified           time.Time        `json:"date_modified,omitempty"`
-	// Order values
-	UnitLoads     []*UnitLoad        `json:"unit_loads,omitempty"`
-	Entries       []*warehouse.Entry `json:"entries,omitempty"`
-	Consolidation []*Shipment        `json:"consolidation,omitempty"`
-	FMRecordID    int64              `json:"-"`
-	ImageUrls     []string           `json:"image_urls,omitempty"`
+	ID                     string             `json:"id,omitempty"`
+	Code                   string             `json:"code,omitempty"`
+	Type                   *ShipmentType      `json:"type,omitempty"`
+	CustomerCode           string             `json:"customer_code,omitempty"`
+	PackagesQty            int                `json:"packages_qty,omitempty"`
+	PiecesQty              int                `json:"pieces_qty,omitempty"`
+	CurrentStatusKey       ShipmentStatus     `json:"current_status,omitempty"`
+	TransferPoint          string             `json:"transfer_point,omitempty"`
+	TransportMethod        *TransportMethod   `json:"transport_method,omitempty"`
+	PackageMethod          string             `json:"package_method,omitempty"`
+	PackageMethodZh        string             `json:"package_method_zh,omitempty"`
+	DepartureWarehouse     string             `json:"departure_warehouse,omitempty"`
+	ArrivalWarehouse       string             `json:"arrival_warehouse,omitempty"`
+	TransferPointWarehouse string             `json:"transfer_point_warehouse,omitempty"`
+	DateCreated            time.Time          `json:"date_created,omitempty"`
+	DateModified           time.Time          `json:"date_modified,omitempty"`
+	UnitLoads              []*UnitLoad        `json:"unit_loads,omitempty"`
+	Entries                []*warehouse.Entry `json:"entries,omitempty"`
+	Consolidation          []*Shipment        `json:"consolidation,omitempty"`
+	FMRecordID             int64              `json:"-"`
+	ImageUrls              []string           `json:"image_urls,omitempty"`
+	PartnerInfo            PartnerInfo        `json:"partner_info"`
+	NeedDeclare            bool               `json:"need_declare"`
 }
 
 type AliasShipment Shipment

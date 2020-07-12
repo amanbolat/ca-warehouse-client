@@ -63,23 +63,11 @@ func (s *EntryStore) GetEntryById(id string) (warehouse.Entry, error) {
 func (s *EntryStore) GetEntryList(meta api.RequestMeta) ([]warehouse.Entry, api.ResponseMeta, error) {
 	var resMeta api.ResponseMeta
 	q := fm.NewFMQuery(s.databaseName, ENTRY_LAYOUT, fm.Find)
-	q.WithFields(
-		fm.FMQueryField{
-			Name:  "Warehouse",
-			Value: "GZWH1",
-			Op:    fm.Equal,
-		},
-		fm.FMQueryField{
-			Name:  "Id_shipmentNumber",
-			Value: "",
-			Op:    fm.Equal,
-		},
-		fm.FMQueryField{
-			Name:  "is_utilized",
-			Value: "",
-			Op:    fm.Equal,
-		},
-	)
+	var qFields []fm.FMQueryField
+	for k, v := range meta.InternalFilter {
+		qFields = append(qFields, fm.FMQueryField{Name: k, Value: v, Op: "="})
+	}
+	q.WithFields(qFields...)
 	recs, resMeta, err := fmutil.GetFileMakerRecordList(s, q, meta)
 	if err != nil {
 		return nil, resMeta, err
@@ -129,7 +117,7 @@ func (s *EntryStore) CreateEntry(e warehouse.Entry) (warehouse.Entry, error) {
 		return warehouse.Entry{}, errors.WithMessage(err, "could not create new entry")
 	}
 
-	resEntry := warehouse.Entry{}
+	resEntry := warehouse.FileMakerEntry{}
 	if len(fmSet.Resultset.Records) < 1 {
 		return warehouse.Entry{}, errors.New("new entry might be created, but no result was returned from database")
 	}
@@ -144,5 +132,5 @@ func (s *EntryStore) CreateEntry(e warehouse.Entry) (warehouse.Entry, error) {
 		return warehouse.Entry{}, err
 	}
 
-	return resEntry, nil
+	return resEntry.ToEntry(), nil
 }

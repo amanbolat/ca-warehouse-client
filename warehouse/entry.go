@@ -1,4 +1,4 @@
-//go:generate gomodifytags -file $GOFILE -struct Entry -add-tags json -w
+//go:generate gomodifytags -file $GOFILE -struct Entry -add-tags json -w  -add-options json=omitempty
 
 package warehouse
 
@@ -26,12 +26,23 @@ func MapEntryFields(meta api.RequestMeta) api.RequestMeta {
 	var newMeta api.RequestMeta
 	newMeta = meta
 	newMeta.SortFields = []api.SortField{}
+	newMeta.InternalFilter = make(map[string]string)
 
 	for _, field := range meta.SortFields {
-		newMeta.SortFields = append(newMeta.SortFields, api.SortField{
-			Name:       entryFieldNamesMap[field.Name],
-			Descending: field.Descending,
-		})
+		n, ok := entryFieldNamesMap[field.Name]
+		if ok {
+			newMeta.SortFields = append(newMeta.SortFields, api.SortField{
+				Name:       n,
+				Descending: field.Descending,
+			})
+		}
+	}
+
+	for _, filter := range meta.Filters {
+		key, ok := entryFieldNamesMap[filter.K]
+		if ok {
+			newMeta.InternalFilter[key] = filter.V
+		}
 	}
 
 	return newMeta
@@ -41,7 +52,7 @@ type Entry struct {
 	ID                 string          `json:"id,omitempty"`
 	CustomerCode       string          `json:"customer_code,omitempty"`
 	ShipmentCode       string          `json:"shipment_code,omitempty"`
-	Status             int             `json:"status"`
+	Status             int             `json:"status,omitempty"`
 	DateOfEntry        time.Time       `json:"date_of_entry,omitempty"`
 	Source             string          `json:"source_of_entry,omitempty"`
 	TrackCode          string          `json:"track_code,omitempty"`
@@ -50,9 +61,9 @@ type Entry struct {
 	ProductName        string          `json:"product_name,omitempty"`
 	Warehouse          string          `json:"warehouse,omitempty"`
 	ImageUrls          []string        `json:"image_urls,omitempty"`
-	IsFoundForShipment bool            `json:"is_found_for_shipment"`
 	HasBrand           bool            `json:"has_brand"`
-	ProductCategory    ProductCategory `json:"product_category"`
+	IsFoundForShipment bool            `json:"is_found_for_shipment"`
+	ProductCategory    ProductCategory `json:"product_category,omitempty"`
 	FMRecordID         int             `json:"-,omitempty"`
 }
 
@@ -75,23 +86,23 @@ type FileMakerEntry struct {
 	FMRecordID         int       `json:"-"`
 }
 
-func (fe FileMakerEntry) ToEntry() Entry {
+func (v *FileMakerEntry) ToEntry() Entry {
 	return Entry{
-		ID:                 fe.ID,
-		CustomerCode:       fe.CustomerCode,
-		ShipmentCode:       fe.ShipmentNumber,
-		Status:             fe.Status,
-		DateOfEntry:        fe.DateOfEntry,
-		Source:             fe.Source,
-		TrackCode:          fe.TrackCode,
-		BoxQty:             int(fe.BoxQty),
-		PcsQty:             int(fe.PcsQty),
-		ProductName:        fe.ProductName,
-		Warehouse:          fe.Warehouse,
-		ImageUrls:          fe.ImageUrls,
-		IsFoundForShipment: fmutil.ConvertToBool(fe.IsFoundForShipment),
-		HasBrand:           fmutil.ConvertToBool(fe.HasBrand),
-		ProductCategory:    ProductCategory(fe.ProductCategory),
-		FMRecordID:         fe.FMRecordID,
+		ID:                 v.ID,
+		CustomerCode:       v.CustomerCode,
+		ShipmentCode:       v.ShipmentNumber,
+		Status:             v.Status,
+		DateOfEntry:        v.DateOfEntry,
+		Source:             v.Source,
+		TrackCode:          v.TrackCode,
+		BoxQty:             int(v.BoxQty),
+		PcsQty:             int(v.PcsQty),
+		ProductName:        v.ProductName,
+		Warehouse:          v.Warehouse,
+		ImageUrls:          v.ImageUrls,
+		IsFoundForShipment: fmutil.ConvertToBool(v.IsFoundForShipment),
+		HasBrand:           fmutil.ConvertToBool(v.HasBrand),
+		ProductCategory:    ProductCategory(v.ProductCategory),
+		FMRecordID:         v.FMRecordID,
 	}
 }

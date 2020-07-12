@@ -60,7 +60,7 @@ func (r *ShipmentStore) GetShipmentList(meta query.RequestMeta) ([]*logistics.Sh
 	q.WithFields(
 		fm.FMQueryField{
 			Name:  "Departure_Warehouse",
-			Value: "GZWH1",
+			Value: "GZWH2",
 			Op:    fm.Equal,
 		},
 		fm.FMQueryField{
