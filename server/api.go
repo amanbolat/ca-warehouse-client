@@ -172,18 +172,13 @@ func (a API) PrintShipmentULLabels(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 
-	bcs, err := a.labelManager.CreateUnitLoadLabels(sm)
+	label, err := a.labelManager.CreateUnitLoadLabels(sm)
 	if err != nil {
 		c.Logger().Error(err)
 		return echo.ErrInternalServerError
 	}
 
-	var paths []string
-	for _, bc := range bcs {
-		paths = append(paths, bc.FullPath)
-	}
-
-	err = a.printer.PrintFiles(copies, "", paths...)
+	err = a.printer.PrintFiles(copies, "", label.FullPath)
 	if err != nil {
 		c.Logger().Error(err)
 		return echo.ErrInternalServerError
@@ -201,7 +196,7 @@ func (a API) PrintShipmentPreparationInfo(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 
-	l, err := a.labelManager.CreateShipmentEntriesLabel(sm)
+	l, err := a.labelManager.CreateShipmentPreparationLabels(sm)
 	if err != nil {
 		c.Logger().Error(err)
 		return echo.ErrInternalServerError

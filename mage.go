@@ -3,8 +3,12 @@
 package main
 
 import (
+	"fmt"
 	"github.com/magefile/mage/sh"
 )
+
+const repoName = "ca-warehouse-client"
+const dockerRegistryName = "087613087242.dkr.ecr.us-west-2.amazonaws.com/ca-warehouse-client"
 
 func Mod() error {
 	return sh.Run("go", "mod", "download")
@@ -29,4 +33,33 @@ func ClearDist() error {
 func Build() error {
 	ClearDist()
 	return sh.Run("go", "build", "-ldflags", "-s -w", "-o", "./dist/whclient", "./cmd/main.go")
+}
+
+func BuildDockerImage() error {
+	gitTag, err := sh.Output("git", "rev-parse", " --short", "HEAD")
+	if err != nil {
+		return err
+	}
+
+	taggedRepoName := fmt.Sprintf("%s:%s", repoName, gitTag)
+
+	err = sh.Run("docker", "build", "-t", taggedRepoName, ".")
+	if err != nil {
+		return err
+	}
+
+	taggedRegistryRepoName := fmt.Sprintf("%s:%s", dockerRegistryName, gitTag)
+	err = sh.Run("docker", "tag", taggedRepoName, taggedRegistryRepoName)
+	if err != nil {
+		return err
+	}
+
+	return sh.Run("docker", "push", taggedRegistryRepoName)
+}
+
+func GitStatus() error {
+	out, _ := sh.Output("git", "status", "-s")
+	fmt.Println(out)
+
+	return nil
 }

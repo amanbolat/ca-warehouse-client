@@ -1,6 +1,7 @@
 package printing
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/amanbolat/ca-warehouse-client/i18n"
 	"github.com/amanbolat/ca-warehouse-client/logistics"
@@ -10,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/xid"
 	"github.com/signintech/gopdf"
+	"image/jpeg"
 	"os"
 	"path"
 	"strings"
@@ -86,89 +88,182 @@ func (lm LabelManager) CreateEntryBarcode(entryId string) (Label, error) {
 	return res, nil
 }
 
-func (lm LabelManager) CreateUnitLoadLabels(shipment logistics.Shipment) ([]Label, error) {
-	var barcodes []Label
+func (lm LabelManager) CreateUnitLoadLabels(shipment logistics.Shipment) (*Label, error) {
 	ulCount := len(shipment.UnitLoads)
 	if ulCount < 1 {
 		return nil, errors.New("there is now unit loads, nothing to print")
 	}
 
+	pdf := &gopdf.GoPdf{}
+	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
+	err := pdf.AddTTFFont("noto-cjk", lm.fontPath)
+	err = pdf.SetFont("noto-cjk", "", 20)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, ul := range shipment.UnitLoads {
-		var ulBarcode Label
-		tmpFilePath := path.Join(os.TempDir(), fmt.Sprintf("%s-unitload-barcode.png", xid.New()))
-		file, err := os.Create(tmpFilePath)
+		pdf.AddPage()
+		// SPN00123
+		pdf.SetY(100)
+		err = pdf.SetFont("noto-cjk", "", 72)
 		if err != nil {
-			return nil, errors.WithMessage(err, "could not create tmp file")
+			return nil, err
 		}
-		defer file.Close()
-
-		dc := gg.NewContext(PAPER_W, PAPER_H)
-		dc.SetRGB(1, 1, 1)
-		dc.Clear()
-		dc.SetRGB(0, 0, 0)
-		err = dc.LoadFontFace(lm.fontPath, 20)
+		err = writeCenteredText(pdf, strings.ToUpper(shipment.Code))
 		if err != nil {
-			return nil, errors.WithMessage(err, "could not load font")
+			return nil, err
 		}
 
-		bcWidth, bcHeight := 50, 50
+		// 1/1
+		err = pdf.SetFont("noto-cjk", "", 40)
+		if err != nil {
+			return nil, err
+		}
+		pdf.SetY(pdf.GetY() + 50)
+		err = writeCenteredText(pdf, fmt.Sprintf("%d/%d", ul.Sequence, ulCount))
+		if err != nil {
+			return nil, err
+		}
+
+		err = pdf.SetFont("noto-cjk", "", 24)
+		if err != nil {
+			return nil, err
+		}
+
+		// Unit load weight and cubage
+		err = pdf.SetFont("noto-cjk", "", 44)
+		if err != nil {
+			return nil, err
+		}
+		pdf.RectFromUpperLeft(20, pdf.GetY()+50, gopdf.PageSizeA4.W-40, 200)
+		weight := fmt.Sprintf("%v kg", ul.Weight)
+		cubage := fmt.Sprintf("%v m3", ul.Cubage())
+
+		weightW, err := pdf.MeasureTextWidth(weight)
+		if err != nil {
+			return nil, err
+		}
+		pdf.SetX(gopdf.PageSizeA4.W/4 - weightW/2)
+		pdf.SetY(pdf.GetY() + 90)
+		err = pdf.Cell(nil, weight)
+		if err != nil {
+			return nil, err
+		}
+
+		cubageW, err := pdf.MeasureTextWidth(cubage)
+		if err != nil {
+			return nil, err
+		}
+		pdf.SetX(gopdf.PageSizeA4.W - gopdf.PageSizeA4.W/4 - cubageW/2)
+		pdf.SetY(pdf.GetY())
+		err = pdf.Cell(nil, cubage)
+		if err != nil {
+			return nil, err
+		}
+
+		pdf.SetY(pdf.GetY() + 120)
+		err = pdf.SetFont("noto-cjk", "", 30)
+		if err != nil {
+			return nil, err
+		}
+		size := fmt.Sprintf("%d cm × %d cm × %d cm", ul.Length, ul.Width, ul.Height)
+		err = writeCenteredText(pdf, size)
+		if err != nil {
+			return nil, err
+		}
+
+		// Shipment weight and cubage
+		err = pdf.SetFont("noto-cjk", "", 24)
+		if err != nil {
+			return nil, err
+		}
+		pdf.SetY(pdf.GetY() + 200)
+
+		shipmentInfo := []string{
+			"Габариты всего груза/货物整体规格:",
+			fmt.Sprintf("ВЕС/重量: %v kg", shipment.Weight()),
+			fmt.Sprintf("ОБЪЕМ/体积: %v m3", shipment.Cubage()),
+		}
+
+		for _, str := range shipmentInfo {
+			pdf.SetX(20)
+			pdf.SetY(pdf.GetY() + 28)
+			err = pdf.Cell(nil, str)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Attention
+		err = pdf.SetFont("noto-cjk", "", 18)
+		if err != nil {
+			return nil, err
+		}
+		attentionText := []string{
+			"ВНИМАНИЕ! При получении груза",
+			"обязательно проверьте целостность",
+			"внешней упаковки и характеристики",
+			"груза!!!",
+		}
+		pdf.SetY(gopdf.PageSizeA4.H - 150)
+
+		for _, str := range attentionText {
+			pdf.SetX(20)
+			pdf.SetY(pdf.GetY() + 20)
+			err = pdf.Cell(nil, str)
+			if err != nil {
+				return nil, err
+			}
+		}
 
 		br, err := qr.Encode(fmt.Sprintf("%s-%d/%d", strings.ToLower(shipment.Code), ul.Sequence, ulCount), qr.H, qr.Auto)
 		if err != nil {
 			return nil, errors.WithMessage(err, "could not encode qr code")
 		}
 
-		bc, err := barcode.Scale(br, bcWidth, bcHeight)
+		bc, err := barcode.Scale(br, 200, 200)
 		if err != nil {
 			return nil, errors.WithMessage(err, "could not scale barcode")
 		}
 
-		dc.DrawImage(bc, 10, 10)
-		dc.DrawStringAnchored(fmt.Sprintf("%s-%d/%d", strings.ToUpper(shipment.Code), ul.Sequence, ulCount), 70, 45, 0, 0)
-		dc.SetLineWidth(1)
-		dc.DrawLine(10, 70, PAPER_W-10, 70)
-		dc.Stroke()
-		dc.LoadFontFace(lm.fontPath, 16)
-		ulInfo := fmt.Sprintf("Габариты места/此包尺寸")
-		dc.DrawStringAnchored(ulInfo, float64(PAPER_W/2), 95, 0.5, 0.5)
-		ulSize := fmt.Sprintf("%s Kg    %s m3    %d × %d × %d", ul.Weight, ul.Cubage(), ul.Height, ul.Length, ul.Width)
-		dc.DrawStringAnchored(ulSize, float64(PAPER_W/2), 130, 0.5, 0.5)
-		dc.DrawLine(10, 165, PAPER_W-10, 165)
-		dc.Stroke()
-		shipmentInfo := fmt.Sprintf("Общие габариты/综合尺寸")
-		dc.DrawStringAnchored(shipmentInfo, float64(PAPER_W/2), 190, 0.5, 0.5)
-		sWeight := fmt.Sprintf("%s Kg    %s m3", shipment.Weight(), shipment.Cubage())
-		dc.DrawStringAnchored(sWeight, float64(PAPER_W/2), 225, 0.5, 0.5)
-
-		// Attention text
-		dc.DrawRectangle(10, 260, PAPER_W-20, 75)
-		dc.Stroke()
-		attentionText := `Внимание! При получении груза обязательно проверьте целостность внешней упаковки и характеристики груза`
-		dc.DrawStringWrapped(attentionText, 20, 270, 0, 0, PAPER_W-30, 1.2, gg.AlignLeft)
-
-		// Contacts
-		dc.LoadFontFace(lm.fontPath, 12)
-		dc.DrawString("Кросс Азия", 10, 380)
-		dc.DrawString("Телефон 1: +7(812)309-73-97", 10, 395)
-		dc.DrawString("Телефон 2: +86 136-9923-3755", 10, 410)
-		dc.DrawString("Сайт: https://crossasia.ru", 10, 425)
-
-		err = dc.EncodePNG(file)
-
+		buf := bytes.NewBuffer([]byte{})
+		err = jpeg.Encode(buf, bc, &jpeg.Options{Quality: 100})
 		if err != nil {
-			return nil, errors.WithMessage(err, "could not encode png file")
+			return nil, errors.WithStack(err)
 		}
 
-		ulBarcode.File = file
-		ulBarcode.FullPath = tmpFilePath
-
-		barcodes = append(barcodes, ulBarcode)
+		img, err := gopdf.ImageHolderByReader(buf)
+		if err != nil {
+			return nil, err
+		}
+		err = pdf.ImageByHolder(img, gopdf.PageSizeA4.W-150, gopdf.PageSizeA4.H-150, nil)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
 	}
 
-	return barcodes, nil
+	tmpFilePath := path.Join(os.TempDir(), fmt.Sprintf("%s-unitload-labels.pdf", xid.New()))
+	file, err := os.Create(tmpFilePath)
+	if err != nil {
+		return nil, errors.WithMessage(err, "could not create tmp file")
+	}
+	defer file.Close()
+
+	err = pdf.WritePdf(tmpFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	label := &Label{
+		File:     file,
+		FullPath: tmpFilePath,
+	}
+
+	return label, nil
 }
 
-func (lm LabelManager) CreateShipmentEntriesLabel(shipment logistics.Shipment) (Label, error) {
+func (lm LabelManager) CreateShipmentPreparationLabels(shipment logistics.Shipment) (Label, error) {
 	pdf := &gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.AddPage()
@@ -177,11 +272,11 @@ func (lm LabelManager) CreateShipmentEntriesLabel(shipment logistics.Shipment) (
 		return Label{}, err
 	}
 
+	// Basic information
 	err = pdf.SetFont("noto-cjk", "", 20)
 	if err != nil {
 		return Label{}, err
 	}
-
 	pdf.SetY(50)
 
 	basicInformation := []string{
@@ -200,11 +295,43 @@ func (lm LabelManager) CreateShipmentEntriesLabel(shipment logistics.Shipment) (
 		pdf.SetY(pdf.GetY() + 24)
 	}
 
+	// Line
 	pdf.SetY(pdf.GetY() + 15)
-	pdf.SetLineWidth(0.5)
 	pdf.RectFromUpperLeft(20, pdf.GetY(), gopdf.PageSizeA4.W-40, 1)
 	pdf.SetY(pdf.GetY() + 15)
 
+	// Note list
+	pdf.SetY(pdf.GetY() + 10)
+	err = pdf.SetFont("noto-cjk", "", 20)
+	if err != nil {
+		return Label{}, err
+	}
+	err = writeCenteredText(pdf, "备注")
+	if err != nil {
+		return Label{}, err
+	}
+
+	err = pdf.SetFont("noto-cjk", "", 16)
+	if err != nil {
+		return Label{}, err
+	}
+	pdf.SetY(pdf.GetY() + 10)
+
+	for i, note := range shipment.Notes {
+		pdf.SetX(40)
+		err = pdf.Cell(nil, fmt.Sprintf("%d: %s", i+1, note.Content))
+		if err != nil {
+			return Label{}, err
+		}
+		safeSetY(pdf, pdf.GetY()+20, 50)
+	}
+
+	// Line
+	pdf.SetY(pdf.GetY() + 15)
+	pdf.RectFromUpperLeft(20, pdf.GetY(), gopdf.PageSizeA4.W-40, 1)
+	pdf.SetY(pdf.GetY() + 15)
+
+	// Entry list
 	pdf.SetY(pdf.GetY() + 10)
 	err = pdf.SetFont("noto-cjk", "", 16)
 	if err != nil {
@@ -260,14 +387,7 @@ func (lm LabelManager) CreateShipmentPartnerInfoLabel(shipment logistics.Shipmen
 	pdf.SetY(50)
 
 	title := fmt.Sprintf("票号 %s 出货信息", shipment.Code)
-	titleWidth, err := pdf.MeasureTextWidth(title)
-
-	if err != nil {
-		return Label{}, nil
-	}
-
-	pdf.SetX(gopdf.PageSizeA4.W/2 - (titleWidth / 2))
-	err = pdf.Text(title)
+	err = writeCenteredText(pdf, title)
 	if err != nil {
 		return Label{}, nil
 	}
@@ -426,4 +546,20 @@ func safeSetY(pdf *gopdf.GoPdf, y float64, newPageY float64) {
 	} else {
 		pdf.SetY(y)
 	}
+}
+
+func writeCenteredText(pdf *gopdf.GoPdf, text string) error {
+	txtWidth, err := pdf.MeasureTextWidth(text)
+
+	if err != nil {
+		return err
+	}
+
+	pdf.SetX(gopdf.PageSizeA4.W/2 - (txtWidth / 2))
+	err = pdf.Text(text)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

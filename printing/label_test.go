@@ -1,6 +1,7 @@
 package printing
 
 import (
+	"github.com/amanbolat/ca-warehouse-client/crm"
 	"github.com/amanbolat/ca-warehouse-client/logistics"
 	"github.com/amanbolat/ca-warehouse-client/warehouse"
 	"github.com/shopspring/decimal"
@@ -12,7 +13,8 @@ import (
 
 var fontPath = os.Getenv("FONT_PATH")
 var sp = logistics.Shipment{
-	Code: "SPN007001",
+	Code:         "SPN007001",
+	CustomerCode: "77-00123",
 	Entries: []*warehouse.Entry{
 		{ID: "EN0001", Source: "顺丰快递", TrackCode: "SF1241923123", BoxQty: 1, PcsQty: 100},
 		{ID: "EN0001", Source: "顺丰快递", TrackCode: "SF1241923123", BoxQty: 12, PcsQty: 100},
@@ -89,6 +91,11 @@ var sp = logistics.Shipment{
 			Destination: "Москва 莫斯科",
 		},
 	},
+	Notes: []*crm.Note{
+		{Content: "加护角"},
+		{Content: "可以发了"},
+		{Content: "尽量往木箱里添加泡沫+纸板什么的"},
+	},
 }
 
 func TestBarcodeManger_CreateEntryBarcode(t *testing.T) {
@@ -109,23 +116,17 @@ func TestBarcodeManger_CreateEntryBarcode(t *testing.T) {
 func TestBarcodeManger_CreateUnitLoadBarcodes(t *testing.T) {
 	bm, err := NewLabelManger(fontPath)
 	assert.NoError(t, err)
-	barcodes, err := bm.CreateUnitLoadLabels(sp)
-
-	for _, bc := range barcodes {
-		assert.NoError(t, err)
-		assert.NotNil(t, bc.File)
-		assert.FileExists(t, bc.FullPath)
-		if assert.FileExists(t, bc.FullPath) {
-			exec.Command("open", bc.FullPath).Run()
-		}
+	labels, err := bm.CreateUnitLoadLabels(sp)
+	if assert.NoError(t, err) {
+		exec.Command("open", labels.FullPath).Run()
 	}
 }
 
-func TestLabelManager_CreateShipmentEntriesLabel(t *testing.T) {
+func TestLabelManager_CreateShipmentPreparationLabel(t *testing.T) {
 	lm, err := NewLabelManger(fontPath)
 	assert.NoError(t, err)
 
-	entriesLabel, err := lm.CreateShipmentEntriesLabel(sp)
+	entriesLabel, err := lm.CreateShipmentPreparationLabels(sp)
 	assert.NoError(t, err)
 	if assert.NoError(t, err) {
 		exec.Command("open", entriesLabel.FullPath).Run()

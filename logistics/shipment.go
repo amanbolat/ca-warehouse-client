@@ -10,6 +10,7 @@ package logistics
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/amanbolat/ca-warehouse-client/crm"
 	"github.com/amanbolat/ca-warehouse-client/filemaker/fmutil"
 	"github.com/amanbolat/ca-warehouse-client/warehouse"
 	"github.com/pkg/errors"
@@ -89,6 +90,7 @@ type FileMakerShipment struct {
 	PartnerTransportationMethod      string                      `json:"partner_transport_method"`
 	PartnerCargoValue                float64                     `json:"Partners||ValuesOfCargo"`
 	NeedDeclare                      int                         `json:"need_declare"`
+	Notes                            []*crm.FileMakerNote        `json:"TO2d_Shipments||Notes"`
 }
 
 func (fs FileMakerShipment) ToShipment() Shipment {
@@ -112,6 +114,12 @@ func (fs FileMakerShipment) ToShipment() Shipment {
 	for _, fs := range fs.Consolidation {
 		s := fs.ToShipment()
 		consolidatedShipments = append(consolidatedShipments, &s)
+	}
+
+	var notes []*crm.Note
+	for _, fn := range fs.Notes {
+		n := fn.ToNote()
+		notes = append(notes, n)
 	}
 
 	return Shipment{
@@ -148,6 +156,7 @@ func (fs FileMakerShipment) ToShipment() Shipment {
 			},
 		},
 		NeedDeclare: fmutil.ConvertToBool(fs.NeedDeclare),
+		Notes:       notes,
 	}
 }
 
@@ -175,6 +184,7 @@ type Shipment struct {
 	ImageUrls              []string           `json:"image_urls,omitempty"`
 	PartnerInfo            PartnerInfo        `json:"partner_info"`
 	NeedDeclare            bool               `json:"need_declare"`
+	Notes                  []*crm.Note        `json:"notes"`
 }
 
 type AliasShipment Shipment
