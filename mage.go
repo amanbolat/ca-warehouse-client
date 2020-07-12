@@ -5,6 +5,8 @@ package main
 import (
 	"fmt"
 	"github.com/magefile/mage/sh"
+	"gopkg.in/errgo.v2/errors"
+	"strings"
 )
 
 const repoName = "ca-warehouse-client"
@@ -35,7 +37,12 @@ func Build() error {
 	return sh.Run("go", "build", "-ldflags", "-s -w", "-o", "./dist/whclient", "./cmd/main.go")
 }
 
-func BuildDockerImage() error {
+func BuildImage() error {
+	out, _ := sh.Output("git", "status", "-s")
+	if strings.TrimSpace(out) != "" {
+		return errors.New("Some files are not committed, can't build docker image")
+	}
+
 	gitTag, err := sh.Output("git", "rev-parse", " --short", "HEAD")
 	if err != nil {
 		return err
@@ -59,7 +66,7 @@ func BuildDockerImage() error {
 
 func GitStatus() error {
 	out, _ := sh.Output("git", "status", "-s")
-	fmt.Println(out)
+	fmt.Printf("[%v]", strings.TrimSpace(out))
 
 	return nil
 }
