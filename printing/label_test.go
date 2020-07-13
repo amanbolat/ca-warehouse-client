@@ -58,7 +58,7 @@ var sp = logistics.Shipment{
 			Length:      100,
 			Height:      33,
 			Width:       55,
-			ProductName: "灯具，LED 包包 衣服 灯具，LED 包包 衣服",
+			ProductName: "",
 		},
 		{
 			Sequence:    2,

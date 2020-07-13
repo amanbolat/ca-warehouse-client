@@ -48,6 +48,15 @@ func MapEntryFields(meta api.RequestMeta) api.RequestMeta {
 	return newMeta
 }
 
+type EntryStatus string
+
+const (
+	EntryStatusUtilized EntryStatus = "utilized"
+	EntryStatusReceived EntryStatus = "received"
+	EntryStatusPacked   EntryStatus = "packed"
+	EntryStatusSentOut  EntryStatus = "sent_out"
+)
+
 type Entry struct {
 	ID                 string          `json:"id,omitempty"`
 	CustomerCode       string          `json:"customer_code,omitempty"`
@@ -83,6 +92,7 @@ type FileMakerEntry struct {
 	IsFoundForShipment int       `json:"is_found_for_shipment"`
 	HasBrand           int       `json:"has_brand"`
 	ProductCategory    string    `json:"product_category"`
+	ShipmentStatusKey  int       `json:"TO4a_Entries||Shipments::ShipmentStatus_number"`
 	FMRecordID         int       `json:"-"`
 }
 
