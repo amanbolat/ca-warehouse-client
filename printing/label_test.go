@@ -83,7 +83,7 @@ var sp = logistics.Shipment{
 	PartnerInfo: logistics.PartnerInfo{
 		Code:           "XX-ZHANGYUNLONG",
 		DeliveryMethod: logistics.DMLandContainer,
-		ProductName:    "LED灯具100个，机子200个，电池300个，配件100个，轮子300，LEDDDDDDDD灯具100个，机子200个，电池300个，配件100个，轮子300",
+		ProductName:    "⚙️LED灯具100个，机子200个，电池300个，配件100个，轮子300，LEDDDDDDDD灯具100个，机子200个，电池300个，配件100个，轮子300",
 		CargoValue:     0,
 		Recipient: logistics.Recipient{
 			Name:        "Михаил задорный 波哥",

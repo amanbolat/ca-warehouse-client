@@ -47,3 +47,6 @@ Temporary Items
 # JetBrains
 .idea
 dist
+
+
+*.env

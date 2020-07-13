@@ -13,6 +13,7 @@ require (
 	github.com/gorilla/schema v1.1.0
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/jinzhu/configor v1.2.0 // indirect
+	github.com/joho/godotenv v1.3.0 // indirect
 	github.com/karrick/godirwalk v1.15.6 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.1.16
@@ -29,6 +30,7 @@ require (
 	github.com/spf13/cobra v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.5.1
+	github.com/tmdvs/Go-Emoji-Utils v1.1.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
 	golang.org/x/image v0.0.0-20200618115811-c13761719519 // indirect
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect

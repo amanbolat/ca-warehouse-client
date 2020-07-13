@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/xid"
 	"github.com/signintech/gopdf"
+	emoji "github.com/tmdvs/Go-Emoji-Utils"
 	"image/jpeg"
 	"os"
 	"path"
@@ -149,7 +150,7 @@ func (lm LabelManager) CreateUnitLoadLabels(shipment logistics.Shipment) (*Label
 		}
 		pdf.SetX(PAPER_W/4 - weightW/2)
 		pdf.SetY(pdf.GetY() + 35)
-		err = pdf.Cell(nil, weight)
+		err = safeCell(pdf, weight)
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +161,7 @@ func (lm LabelManager) CreateUnitLoadLabels(shipment logistics.Shipment) (*Label
 		}
 		pdf.SetX(PAPER_W - PAPER_W/4 - cubageW/2)
 		pdf.SetY(pdf.GetY())
-		err = pdf.Cell(nil, cubage)
+		err = safeCell(pdf, cubage)
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +193,7 @@ func (lm LabelManager) CreateUnitLoadLabels(shipment logistics.Shipment) (*Label
 		for _, str := range shipmentInfo {
 			pdf.SetX(5)
 			pdf.SetY(pdf.GetY() + 18)
-			err = pdf.Cell(nil, str)
+			err = safeCell(pdf, str)
 			if err != nil {
 				return nil, err
 			}
@@ -214,7 +215,7 @@ func (lm LabelManager) CreateUnitLoadLabels(shipment logistics.Shipment) (*Label
 		for _, str := range attentionText {
 			pdf.SetX(5)
 			pdf.SetY(pdf.GetY() + 14)
-			err = pdf.Cell(nil, str)
+			err = safeCell(pdf, str)
 			if err != nil {
 				return nil, err
 			}
@@ -295,7 +296,7 @@ func (lm LabelManager) CreateShipmentPreparationLabels(shipment logistics.Shipme
 
 	for _, l := range basicInformation {
 		pdf.SetX(5)
-		err = pdf.Cell(nil, l)
+		err = safeCell(pdf, l)
 		if err != nil {
 			return Label{}, err
 		}
@@ -326,7 +327,7 @@ func (lm LabelManager) CreateShipmentPreparationLabels(shipment logistics.Shipme
 
 	for i, note := range shipment.Notes {
 		pdf.SetX(5)
-		err = pdf.Cell(nil, fmt.Sprintf("%d: %s", i+1, note.Content))
+		err = safeCell(pdf, fmt.Sprintf("%d: %s", i+1, note.Content))
 		if err != nil {
 			return Label{}, err
 		}
@@ -349,7 +350,7 @@ func (lm LabelManager) CreateShipmentPreparationLabels(shipment logistics.Shipme
 		// pdf.RectFromUpperLeft(5, pdf.GetY(), 13, 13)
 		pdf.SetX(5)
 		text := fmt.Sprintf("%d. %s (%d) %s %s", i+1, entry.ID, entry.BoxQty, entry.Source, entry.TrackCode)
-		err = pdf.Cell(nil, text)
+		err = safeCell(pdf, text)
 		if err != nil {
 			return Label{}, err
 		}
@@ -395,7 +396,7 @@ func (lm LabelManager) CreateShipmentPartnerInfoLabel(shipment logistics.Shipmen
 		return Label{}, err
 	}
 
-	pdf.SetY(15)
+	pdf.SetY(30)
 
 	title := fmt.Sprintf("票号 %s 出货信息", shipment.Code)
 	err = writeCenteredText(pdf, title)
@@ -421,7 +422,7 @@ func (lm LabelManager) CreateShipmentPartnerInfoLabel(shipment logistics.Shipmen
 
 	for _, l := range basicInformation {
 		pdf.SetX(5)
-		err = pdf.Cell(nil, l)
+		err = safeCell(pdf, l)
 		if err != nil {
 			return Label{}, err
 		}
@@ -439,7 +440,7 @@ func (lm LabelManager) CreateShipmentPartnerInfoLabel(shipment logistics.Shipmen
 
 	for _, l := range cargoInfo {
 		pdf.SetX(PAPER_W / 2)
-		err = pdf.Cell(nil, l)
+		err = safeCell(pdf, l)
 		if err != nil {
 			return Label{}, err
 		}
@@ -457,7 +458,7 @@ func (lm LabelManager) CreateShipmentPartnerInfoLabel(shipment logistics.Shipmen
 
 	for _, l := range recipientInfo {
 		pdf.SetX(5)
-		err = pdf.Cell(nil, l)
+		err = safeCell(pdf, l)
 		if err != nil {
 			return Label{}, err
 		}
@@ -481,7 +482,7 @@ func (lm LabelManager) CreateShipmentPartnerInfoLabel(shipment logistics.Shipmen
 			pdf.SetX(5)
 		}
 
-		err = pdf.Cell(nil, pn)
+		err = safeCell(pdf, pn)
 		if err != nil {
 			return Label{}, errors.WithStack(err)
 		}
@@ -504,19 +505,19 @@ func (lm LabelManager) CreateShipmentPartnerInfoLabel(shipment logistics.Shipmen
 		weight := fmt.Sprintf("%d. %v kg", i+1, ul.Weight)
 		size := fmt.Sprintf("%d×%d×%d", ul.Length, ul.Width, ul.Height)
 		cubage := fmt.Sprintf("%v m3", ul.Cubage())
-		err = pdf.Cell(nil, weight)
+		err = safeCell(pdf, weight)
 		if err != nil {
 			return Label{}, err
 		}
 
 		pdf.SetX(120)
-		err = pdf.Cell(nil, size)
+		err = safeCell(pdf, size)
 		if err != nil {
 			return Label{}, err
 		}
 
 		pdf.SetX(220)
-		err = pdf.Cell(nil, cubage)
+		err = safeCell(pdf, cubage)
 		if err != nil {
 			return Label{}, err
 		}
@@ -527,7 +528,7 @@ func (lm LabelManager) CreateShipmentPartnerInfoLabel(shipment logistics.Shipmen
 		pns := safeSplitText(pdf, ul.ProductName, gopdf.PageSizeA4.W-20-pdf.GetX())
 		for i, pn := range pns {
 			pdf.SetX(5 + sequenceW)
-			err = pdf.Cell(nil, pn)
+			err = safeCell(pdf, pn)
 			if err != nil {
 				return Label{}, err
 			}
@@ -585,9 +586,35 @@ func writeCenteredText(pdf *gopdf.GoPdf, text string) error {
 }
 
 func safeSplitText(pdf *gopdf.GoPdf, txt string, width float64) []string {
+	txt = removeEmojis(txt)
 	if strings.TrimSpace(txt) == "" {
 		return []string{}
 	}
 	strArr, _ := pdf.SplitText(txt, width)
 	return strArr
+}
+
+// safeCell removes all emojis from string
+func safeCell(pdf *gopdf.GoPdf, str string) error {
+	str = removeEmojis(str)
+	return pdf.Cell(nil, str)
+}
+
+func removeEmojis(str string) string {
+	emojis := emoji.FindAll(str)
+	var deletedLen int
+
+	for _, v := range emojis {
+		for _, loc := range v.Locations {
+			start := loc[0]
+			end := loc[1]
+
+			runesLeft := []rune(str)[:start-deletedLen]
+			runesRight := []rune(str)[end-deletedLen:]
+			str = string(runesLeft) + string(runesRight)
+			deletedLen += end - start
+		}
+	}
+
+	return str
 }

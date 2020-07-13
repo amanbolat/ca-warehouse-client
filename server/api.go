@@ -225,6 +225,7 @@ func (a API) PrintShipmentPartnerInfo(c echo.Context) error {
 		c.Logger().Error(err)
 		return echo.ErrInternalServerError
 	}
+	c.Logger().Printf("printing shipmentPartnerInfo, path to file: %s", l.FullPath)
 
 	err = a.printer.PrintFiles(1, "", l.FullPath)
 	if err != nil {

@@ -31,7 +31,7 @@ func (p Printer) PrintFiles(copies int, media string, paths ...string) error {
 	if strings.TrimSpace(p.Name) == "" {
 		return errors.New("no printer name was given")
 	}
-	printCmd := exec.Command("lpr", "-P", p.Name, "-#", strconv.Itoa(copies), "-o", fmt.Sprintf("media=%s", media), "-r", strings.Join(paths, " "))
+	printCmd := exec.Command("lpr", "-P", p.Name, "-#", strconv.Itoa(copies), "-o", fmt.Sprintf("media=%s", media), strings.Join(paths, " "))
 	out, err := printCmd.CombinedOutput()
 	if err != nil {
 		return errors.WithMessage(err, string(out))
