@@ -9,7 +9,7 @@ import (
 )
 
 const MAX_COPIES = 3
-const DEFAULT_MEDIA = "a4"
+const DEFAULT_MEDIA = "Custom.4x6in"
 
 type Printer struct {
 	Name string

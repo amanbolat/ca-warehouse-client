@@ -265,7 +265,11 @@ func (lm LabelManager) CreateUnitLoadLabels(shipment logistics.Shipment) (*Label
 
 func (lm LabelManager) CreateShipmentPreparationLabels(shipment logistics.Shipment) (Label, error) {
 	pdf := &gopdf.GoPdf{}
-	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
+	pageSize := gopdf.Rect{
+		W: PAPER_W,
+		H: PAPER_H,
+	}
+	pdf.Start(gopdf.Config{PageSize: pageSize})
 	pdf.AddPage()
 	err := pdf.AddTTFFont("noto-cjk", lm.fontPath)
 	if err != nil {
@@ -273,11 +277,11 @@ func (lm LabelManager) CreateShipmentPreparationLabels(shipment logistics.Shipme
 	}
 
 	// Basic information
-	err = pdf.SetFont("noto-cjk", "", 20)
+	err = pdf.SetFont("noto-cjk", "", 16)
 	if err != nil {
 		return Label{}, err
 	}
-	pdf.SetY(50)
+	pdf.SetY(15)
 
 	basicInformation := []string{
 		fmt.Sprintf("票号: %s", shipment.Code),
@@ -287,22 +291,22 @@ func (lm LabelManager) CreateShipmentPreparationLabels(shipment logistics.Shipme
 	}
 
 	for _, l := range basicInformation {
-		pdf.SetX(20)
+		pdf.SetX(5)
 		err = pdf.Cell(nil, l)
 		if err != nil {
 			return Label{}, err
 		}
-		pdf.SetY(pdf.GetY() + 24)
+		pdf.SetY(pdf.GetY() + 20)
 	}
 
 	// Line
-	pdf.SetY(pdf.GetY() + 15)
-	pdf.RectFromUpperLeft(20, pdf.GetY(), gopdf.PageSizeA4.W-40, 1)
-	pdf.SetY(pdf.GetY() + 15)
+	pdf.SetY(pdf.GetY() + 10)
+	pdf.RectFromUpperLeft(5, pdf.GetY(), PAPER_W-10, 1)
+	pdf.SetY(pdf.GetY() + 10)
 
 	// Note list
 	pdf.SetY(pdf.GetY() + 10)
-	err = pdf.SetFont("noto-cjk", "", 20)
+	err = pdf.SetFont("noto-cjk", "", 16)
 	if err != nil {
 		return Label{}, err
 	}
@@ -311,43 +315,43 @@ func (lm LabelManager) CreateShipmentPreparationLabels(shipment logistics.Shipme
 		return Label{}, err
 	}
 
-	err = pdf.SetFont("noto-cjk", "", 16)
+	err = pdf.SetFont("noto-cjk", "", 12)
 	if err != nil {
 		return Label{}, err
 	}
 	pdf.SetY(pdf.GetY() + 10)
 
 	for i, note := range shipment.Notes {
-		pdf.SetX(40)
+		pdf.SetX(5)
 		err = pdf.Cell(nil, fmt.Sprintf("%d: %s", i+1, note.Content))
 		if err != nil {
 			return Label{}, err
 		}
-		safeSetY(pdf, pdf.GetY()+20, 50)
+		safeSetY(pdf, pdf.GetY()+16, 5)
 	}
 
 	// Line
-	pdf.SetY(pdf.GetY() + 15)
-	pdf.RectFromUpperLeft(20, pdf.GetY(), gopdf.PageSizeA4.W-40, 1)
-	pdf.SetY(pdf.GetY() + 15)
+	pdf.SetY(pdf.GetY() + 5)
+	pdf.RectFromUpperLeft(5, pdf.GetY(), PAPER_W-10, 1)
+	pdf.SetY(pdf.GetY() + 10)
 
 	// Entry list
 	pdf.SetY(pdf.GetY() + 10)
-	err = pdf.SetFont("noto-cjk", "", 16)
+	err = pdf.SetFont("noto-cjk", "", 12)
 	if err != nil {
 		return Label{}, err
 	}
 
 	for i, entry := range shipment.Entries {
-		pdf.RectFromUpperLeft(20, pdf.GetY(), 15, 15)
-		pdf.SetX(40)
-		text := fmt.Sprintf("%d. %s (%d)   %s  %s", i+1, entry.ID, entry.BoxQty, entry.Source, entry.TrackCode)
+		// pdf.RectFromUpperLeft(5, pdf.GetY(), 13, 13)
+		pdf.SetX(5)
+		text := fmt.Sprintf("%d. %s (%d) %s %s", i+1, entry.ID, entry.BoxQty, entry.Source, entry.TrackCode)
 		err = pdf.Cell(nil, text)
 		if err != nil {
 			return Label{}, err
 		}
 
-		safeSetY(pdf, pdf.GetY()+20, 50)
+		safeSetY(pdf, pdf.GetY()+16, 5)
 	}
 
 	tmpFilePath := path.Join(os.TempDir(), fmt.Sprintf("%s-ShipmentEntriesLabel.pdf", xid.New()))
@@ -540,7 +544,7 @@ func (lm LabelManager) CreateShipmentPartnerInfoLabel(shipment logistics.Shipmen
 }
 
 func safeSetY(pdf *gopdf.GoPdf, y float64, newPageY float64) {
-	if pdf.GetY()+100 > gopdf.PageSizeA4.H {
+	if pdf.GetY()+40 > PAPER_H {
 		pdf.AddPage()
 		pdf.SetY(newPageY)
 	} else {
@@ -555,7 +559,7 @@ func writeCenteredText(pdf *gopdf.GoPdf, text string) error {
 		return err
 	}
 
-	pdf.SetX(gopdf.PageSizeA4.W/2 - (txtWidth / 2))
+	pdf.SetX(PAPER_W/2 - (txtWidth / 2))
 	err = pdf.Text(text)
 	if err != nil {
 		return err
