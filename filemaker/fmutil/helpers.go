@@ -22,7 +22,7 @@ func validatePagination(q *fm.FMQuery, rm api.RequestMeta) {
 }
 
 // withAudit adds script and params for audit log
-func withAudit(q *fm.FMQuery, id, table, field, data, user string) {
+func WithAudit(q *fm.FMQuery, id, table, field, data, user string) {
 	q.WithPostFindScript(SCRIPT_AUDIT_LOG, strings.Join([]string{id, table, field, data, user}, SCRIPT_DELIMITER))
 }
 

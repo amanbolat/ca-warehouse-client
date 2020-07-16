@@ -180,7 +180,7 @@ type Shipment struct {
 	UnitLoads              []*UnitLoad        `json:"unit_loads,omitempty"`
 	Entries                []*warehouse.Entry `json:"entries,omitempty"`
 	Consolidation          []*Shipment        `json:"consolidation,omitempty"`
-	FMRecordID             int64              `json:"-"`
+	FMRecordID             int64              `json:"fm_record_id"`
 	ImageUrls              []string           `json:"image_urls,omitempty"`
 	PartnerInfo            PartnerInfo        `json:"partner_info"`
 	NeedDeclare            bool               `json:"need_declare"`

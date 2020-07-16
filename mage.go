@@ -13,28 +13,27 @@ const repoName = "ca-warehouse-client"
 const dockerRegistryName = "087613087242.dkr.ecr.us-west-2.amazonaws.com/ca-warehouse-client"
 
 func Mod() error {
-	return sh.Run("go", "mod", "download")
+	return sh.RunV("go", "mod", "download")
 }
 
 func Generate() error {
-	return sh.Run("go", "generate", "./...")
+	return sh.RunV("go", "generate", "./...")
 }
 
 func Run() error {
 	if err := Mod(); err != nil {
 		return err
 	}
-
-	return sh.Run("go", "run", "./cmd/main.go")
+	return sh.RunV("go", "run", "./cmd/main.go", "-c", "docker.env", "run")
 }
 
 func ClearDist() error {
-	return sh.Run("rm", "-rf", "./dist")
+	return sh.RunV("rm", "-rf", "./dist")
 }
 
 func Build() error {
 	ClearDist()
-	return sh.Run("go", "build", "-ldflags", "-s -w", "-o", "./dist/whclient", "./cmd/main.go")
+	return sh.RunV("go", "build", "-ldflags", "-s -w", "-o", "./dist/whclient", "./cmd/main.go")
 }
 
 func BuildImage() error {
@@ -50,18 +49,18 @@ func BuildImage() error {
 
 	taggedRepoName := fmt.Sprintf("%s:%s", repoName, gitTag)
 
-	err = sh.Run("docker", "build", "-t", taggedRepoName, ".")
+	err = sh.RunV("docker", "build", "-t", taggedRepoName, ".")
 	if err != nil {
 		return err
 	}
 
 	taggedRegistryRepoName := fmt.Sprintf("%s:%s", dockerRegistryName, gitTag)
-	err = sh.Run("docker", "tag", taggedRepoName, taggedRegistryRepoName)
+	err = sh.RunV("docker", "tag", taggedRepoName, taggedRegistryRepoName)
 	if err != nil {
 		return err
 	}
 
-	return sh.Run("docker", "push", taggedRegistryRepoName)
+	return sh.RunV("docker", "push", taggedRegistryRepoName)
 }
 
 func GitStatus() error {

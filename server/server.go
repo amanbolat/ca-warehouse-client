@@ -21,16 +21,22 @@ import (
 )
 
 type Server struct {
-	router *echo.Echo
+	router   *echo.Echo
+	memCache *cache.Cache
 }
 
 func NewServer(config config.Config) Server {
+	s := Server{
+		memCache: cache.New(time.Hour*24, time.Hour*30),
+	}
+
 	e := echo.New()
 	if config.Debug {
 		e.Debug = true
 	}
 	conn := gofmcon.NewFMConnector(config.FmHost, "", config.FmUser, config.FmPass)
 	entryStore := filemaker.NewEntryStore(conn, config.FmDatabaseName)
+	entryStore.FMConn().SetDebug(config.Debug)
 	shipmentStore := filemaker.NewShipmentStore(conn, config.FmDatabaseName)
 	customerStore := filemaker.NewCustomerStore(conn, config.FmDatabaseName)
 
@@ -41,19 +47,39 @@ func NewServer(config config.Config) Server {
 
 	m := NewBroadcaster()
 	var a = API{
-		entryStore:    entryStore,
-		shipmentStore: shipmentStore,
-		customerStore: customerStore,
-		wsServer:      m,
-		memCache:      cache.New(time.Minute*5, time.Minute*7),
-		kdniaoApi:     api.NewKDNiaoApi(config.KDNiaoConfig),
-		printer:       printing.Printer{Name: config.Printer},
-		labelManager:  lm,
+		entryStore:       entryStore,
+		shipmentStore:    shipmentStore,
+		customerStore:    customerStore,
+		wsServer:         m,
+		memCache:         cache.New(time.Minute*5, time.Minute*7),
+		kdniaoApi:        api.NewKDNiaoApi(config.KDNiaoConfig),
+		printer:          printing.Printer{Name: config.Printer},
+		labelManager:     lm,
+		apiRequestsCache: s.memCache,
 	}
-	e.Use(middleware.Logger(), middleware.Recover(), middleware.CORSWithConfig(middleware.CORSConfig{
+
+	e.HTTPErrorHandler = func(err error, c echo.Context) {
+		c.Logger().Error(err)
+		apiErr, ok := err.(api.Error)
+		if ok {
+			err = c.JSON(http.StatusServiceUnavailable, apiErr)
+			if err != nil {
+				c.Logger().Error(err)
+			}
+		} else {
+			e.DefaultHTTPErrorHandler(err, c)
+		}
+	}
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Skipper: middleware.DefaultSkipper,
+		Format: `{"time":"${time_rfc3339_nano}","remote_ip":"${remote_ip}",` +
+			`"method":"${method}","uri":"${uri}","status":${status},` +
+			`"latency_human":"${latency_human}"` + "\n",
+		Output: os.Stdout,
+	}), middleware.Recover(), middleware.CORSWithConfig(middleware.CORSConfig{
 		Skipper:          middleware.DefaultSkipper,
 		AllowOrigins:     []string{"http://localhost:8080", "http://localhost:80", "https://wh.me", "http://wh.me"},
-		AllowMethods:     []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
+		AllowMethods:     []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete, "X-API-REQUEST-ID"},
 		AllowCredentials: true,
 	}))
 
@@ -61,7 +87,7 @@ func NewServer(config config.Config) Server {
 	g.GET("/entries", a.GetEntryList)
 	g.GET("/entries/:id", a.GetEntrySingle)
 	g.POST("/entries/:id/print_barcode", a.PrintEntryBarcode)
-	g.POST("/entries", a.CreateEntry)
+	g.POST("/entries", s.duplicatePreventMiddleware(a.CreateEntry))
 	g.PATCH("/entries", a.EditEntry)
 	g.GET("/shipments", a.GetShipmentList)
 	g.GET("/shipments/:code", a.GetShipmentSingle)
@@ -71,9 +97,7 @@ func NewServer(config config.Config) Server {
 	g.GET("/customers", a.GetCustomerList)
 	g.GET("/kdniao/get_source/:track_code", a.GetSourceByTrackCode)
 
-	s := Server{
-		router: e,
-	}
+	s.router = e
 
 	return s
 }
@@ -81,7 +105,7 @@ func NewServer(config config.Config) Server {
 func (s Server) Start(port int) {
 	go func() {
 		if err := s.router.Start(fmt.Sprintf(":%d", port)); err != nil {
-			s.router.Logger.Info("shutting down the server")
+			s.router.Logger.Fatalf("failed to start server: %s", err.Error())
 		}
 	}()
 
@@ -107,4 +131,27 @@ func NewBroadcaster() *melody.Melody {
 	// m.HandleDisconnect()
 
 	return m
+}
+
+func (s Server) duplicatePreventMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if c.Request().Method != http.MethodPost {
+			c.Logger().Warnf("duplicatePreventMiddleware used on method %s, buy should be used on POST only", c.Request().Method)
+			return next(c)
+		}
+		apiRequestId := c.Request().Header.Get(XApiRequestId)
+		if apiRequestId == "" {
+			return api.NewError(echo.ErrServiceUnavailable, "没有收到请求ID", "")
+		}
+
+		_, ok := s.memCache.Get(apiRequestId)
+		if ok {
+			return api.NewError(echo.ErrServiceUnavailable, "不允许重复请求", "建议您刷新页面再试试")
+		}
+
+		s.memCache.SetDefault(apiRequestId, true)
+		c.Set(XApiRequestId, apiRequestId)
+
+		return next(c)
+	}
 }

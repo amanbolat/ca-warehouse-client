@@ -54,7 +54,7 @@ func (r *ShipmentStore) updateShipment(q *fm.FMQuery) (logistics.Shipment, error
 	return fShipment.ToShipment(), nil
 }
 
-func (r *ShipmentStore) GetShipmentList(meta query.RequestMeta) ([]*logistics.Shipment, query.ResponseMeta, error) {
+func (r *ShipmentStore) GetShipmentList(meta query.RequestMeta) ([]logistics.Shipment, query.ResponseMeta, error) {
 	var resMeta query.ResponseMeta
 	q := fm.NewFMQuery(r.databaseName, SHIPMENT_LAYOUT, fm.Find)
 	q.WithFields(
@@ -74,7 +74,7 @@ func (r *ShipmentStore) GetShipmentList(meta query.RequestMeta) ([]*logistics.Sh
 		return nil, resMeta, err
 	}
 
-	var shipments []*logistics.Shipment
+	var shipments []logistics.Shipment
 	for _, rec := range recs {
 		fShipment := logistics.FileMakerShipment{}
 		b, err := rec.JsonFields()
@@ -86,7 +86,7 @@ func (r *ShipmentStore) GetShipmentList(meta query.RequestMeta) ([]*logistics.Sh
 			return nil, resMeta, err
 		}
 		s := fShipment.ToShipment()
-		shipments = append(shipments, &s)
+		shipments = append(shipments, s)
 	}
 
 	return shipments, resMeta, nil

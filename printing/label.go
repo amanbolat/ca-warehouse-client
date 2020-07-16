@@ -3,6 +3,7 @@ package printing
 import (
 	"bytes"
 	"fmt"
+	"github.com/amanbolat/ca-warehouse-client/api"
 	"github.com/amanbolat/ca-warehouse-client/i18n"
 	"github.com/amanbolat/ca-warehouse-client/logistics"
 	"github.com/boombuler/barcode"
@@ -92,7 +93,7 @@ func (lm LabelManager) CreateEntryBarcode(entryId string) (Label, error) {
 func (lm LabelManager) CreateUnitLoadLabels(shipment logistics.Shipment) (*Label, error) {
 	ulCount := len(shipment.UnitLoads)
 	if ulCount < 1 {
-		return nil, errors.New("there is now unit loads, nothing to print")
+		return nil, api.NewError(nil, fmt.Sprintf("%s 票号没有内容，无法打印", shipment.Code), "请确认此票货物是否已打包或确保每包信息已录入系统")
 	}
 
 	pdf := &gopdf.GoPdf{}
@@ -355,7 +356,7 @@ func (lm LabelManager) CreateShipmentPreparationLabels(shipment logistics.Shipme
 			return Label{}, err
 		}
 
-		safeSetY(pdf, pdf.GetY()+16, 5)
+		safeSetY(pdf, pdf.GetY()+16, 15)
 	}
 
 	tmpFilePath := path.Join(os.TempDir(), fmt.Sprintf("%s-ShipmentEntriesLabel.pdf", xid.New()))
