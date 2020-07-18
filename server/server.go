@@ -6,51 +6,59 @@ import (
 	"github.com/amanbolat/ca-warehouse-client/api"
 	"github.com/amanbolat/ca-warehouse-client/config"
 	"github.com/amanbolat/ca-warehouse-client/filemaker"
-	model "github.com/amanbolat/ca-warehouse-client/logistics"
 	"github.com/amanbolat/ca-warehouse-client/printing"
 	"github.com/amanbolat/gofmcon"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/patrickmn/go-cache"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/olahol/melody.v1"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 )
 
 type Server struct {
-	router   *echo.Echo
-	memCache *cache.Cache
+	router        *echo.Echo
+	memCache      *cache.Cache
+	logger        *logrus.Logger
+	wsServer      *melody.Melody
+	wsSessions    *sync.Map
+	shipmentStore *filemaker.ShipmentStore
 }
 
-func NewServer(config config.Config) Server {
-	s := Server{
-		memCache: cache.New(time.Hour*24, time.Hour*30),
-	}
-
-	e := echo.New()
-	if config.Debug {
-		e.Debug = true
-	}
+func NewServer(config config.Config, logger *logrus.Logger) Server {
 	conn := gofmcon.NewFMConnector(config.FmHost, "", config.FmUser, config.FmPass)
 	entryStore := filemaker.NewEntryStore(conn, config.FmDatabaseName)
 	entryStore.FMConn().SetDebug(config.Debug)
 	shipmentStore := filemaker.NewShipmentStore(conn, config.FmDatabaseName)
 	customerStore := filemaker.NewCustomerStore(conn, config.FmDatabaseName)
 
+	s := Server{
+		memCache:      cache.New(time.Hour*24, time.Hour*30),
+		logger:        logger,
+		wsServer:      melody.New(),
+		wsSessions:    &sync.Map{},
+		shipmentStore: shipmentStore,
+	}
+
+	e := echo.New()
+	if config.Debug {
+		e.Debug = true
+	}
+
 	lm, err := printing.NewLabelManger(config.FontPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	m := NewBroadcaster()
 	var a = API{
 		entryStore:       entryStore,
 		shipmentStore:    shipmentStore,
 		customerStore:    customerStore,
-		wsServer:         m,
 		memCache:         cache.New(time.Minute*5, time.Minute*7),
 		kdniaoApi:        api.NewKDNiaoApi(config.KDNiaoConfig),
 		printer:          printing.Printer{Name: config.Printer},
@@ -98,6 +106,8 @@ func NewServer(config config.Config) Server {
 	g.GET("/kdniao/get_source/:track_code", a.GetSourceByTrackCode)
 
 	s.router = e
+	s.SetupWsServer()
+	s.StartShipmentUpdates()
 
 	return s
 }
@@ -119,18 +129,19 @@ func (s Server) Start(port int) {
 	}
 }
 
-type BroadcastingChans struct {
-	Shipments []model.Shipment
-}
-
-func NewBroadcaster() *melody.Melody {
-	m := melody.New()
-
-	// m.HandleConnect()
-	//
-	// m.HandleDisconnect()
-
-	return m
+func (s Server) SetupWsServer() {
+	s.wsServer.HandleConnect(func(sess *melody.Session) {
+		s.wsSessions.Load(sess)
+		s.logger.Info("New ws user connection")
+	})
+	s.wsServer.HandleDisconnect(func(sess *melody.Session) {
+		s.wsSessions.Delete(sess)
+		s.logger.Info("Ws user disconnected")
+	})
+	wsGroup := s.router.Group("/ws")
+	wsGroup.GET("/shipments", func(c echo.Context) error {
+		return s.wsServer.HandleRequest(c.Response(), c.Request())
+	})
 }
 
 func (s Server) duplicatePreventMiddleware(next echo.HandlerFunc) echo.HandlerFunc {

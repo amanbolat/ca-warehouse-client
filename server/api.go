@@ -10,7 +10,6 @@ import (
 	"github.com/gorilla/schema"
 	"github.com/labstack/echo/v4"
 	"github.com/patrickmn/go-cache"
-	"gopkg.in/olahol/melody.v1"
 	"net/http"
 	"strconv"
 )
@@ -24,7 +23,6 @@ type API struct {
 	entryStore       *filemaker.EntryStore
 	shipmentStore    *filemaker.ShipmentStore
 	customerStore    *filemaker.CustomerStore
-	wsServer         *melody.Melody
 	memCache         *cache.Cache
 	kdniaoApi        *api.KDNiaoApi
 	printer          printing.Printer
@@ -268,10 +266,6 @@ func (a API) CreateEntry(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, newEntry)
-}
-
-func (a API) ShipmentsWS(c echo.Context) error {
-	return a.wsServer.HandleRequest(c.Response(), c.Request())
 }
 
 // removeApiRequestId removes XApiRequestId from

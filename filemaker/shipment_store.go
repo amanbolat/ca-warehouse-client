@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	SHIPMENT_LAYOUT = "warehouse_shipment_single"
+	SHIPMENT_LAYOUT         = "warehouse_shipment_single"
+	SHIPMENT_UPDATES_LAYOUT = "warehouse_shipment_updates"
 )
 
 type ShipmentStore struct {
@@ -70,6 +71,45 @@ func (r *ShipmentStore) GetShipmentList(meta query.RequestMeta) ([]logistics.Shi
 		})
 
 	recs, resMeta, err := fmutil.GetFileMakerRecordList(r, q, meta)
+	if err != nil {
+		return nil, resMeta, err
+	}
+
+	var shipments []logistics.Shipment
+	for _, rec := range recs {
+		fShipment := logistics.FileMakerShipment{}
+		b, err := rec.JsonFields()
+		if err != nil {
+			return nil, resMeta, err
+		}
+		err = json.Unmarshal(b, &fShipment)
+		if err != nil {
+			return nil, resMeta, err
+		}
+		s := fShipment.ToShipment()
+		shipments = append(shipments, s)
+	}
+
+	return shipments, resMeta, nil
+}
+
+// GetShipmentUpdates gets only list of shipments with updated_at, id and code fields
+func (r *ShipmentStore) GetShipmentUpdates() ([]logistics.Shipment, query.ResponseMeta, error) {
+	var resMeta query.ResponseMeta
+	q := fm.NewFMQuery(r.databaseName, SHIPMENT_UPDATES_LAYOUT, fm.Find)
+	q.WithFields(
+		fm.FMQueryField{
+			Name:  "Departure_Warehouse",
+			Value: "GZWH2",
+			Op:    fm.Equal,
+		},
+		fm.FMQueryField{
+			Name:  "ShipmentStatus_number",
+			Value: "1...2",
+			Op:    "=",
+		})
+
+	recs, resMeta, err := fmutil.GetFileMakerRecordList(r, q, query.RequestMeta{})
 	if err != nil {
 		return nil, resMeta, err
 	}

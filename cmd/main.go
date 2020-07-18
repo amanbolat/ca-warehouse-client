@@ -59,7 +59,7 @@ func main() {
 						logger.Fatalf("could not parse env vars: %v", err)
 					}
 
-					s := server.NewServer(conf)
+					s := server.NewServer(conf, logger)
 					s.Start(conf.Port)
 
 					return nil
