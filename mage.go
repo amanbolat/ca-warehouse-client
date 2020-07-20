@@ -81,7 +81,7 @@ func TagPush() error {
 		return err
 	}
 
-	err = sh.RunV("git", "push", version)
+	err = sh.RunV("git", "push", "origin", version)
 	if err != nil {
 		return err
 	}
