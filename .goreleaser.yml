@@ -13,7 +13,10 @@ builds:
       - darwin
     goarch:
       - amd64
-
+source:
+  # Whether this pipe is enabled or not.
+  # Defaults to `false`
+  enabled: true
 archives:
   - replacements:
       darwin: Darwin
