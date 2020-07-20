@@ -70,8 +70,13 @@ func TagPush() error {
 		return errors.New("Some files are not committed, can't build docker image")
 	}
 
+	commitMsg, err := sh.Output("git", "log", "-1", "--pretty=%B")
+	if err != nil {
+		return err
+	}
+
 	version := fmt.Sprintf("%d.%d%d.%d", time.Now().Year(), time.Now().Month(), time.Now().YearDay(), time.Now().Unix())
-	err := sh.RunV("git", "tag", "-a", version)
+	err := sh.RunV("git", "tag", "-a", version, "-m", commitMsg)
 	if err != nil {
 		return err
 	}
