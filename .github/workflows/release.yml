@@ -2,8 +2,7 @@ name: goreleaser
 
 on:
   push:
-    branches-ignore:
-      - '*'
+    tags:
 
 jobs:
   goreleaser:
