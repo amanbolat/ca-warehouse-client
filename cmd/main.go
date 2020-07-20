@@ -12,6 +12,7 @@ import (
 
 var conf config.Config
 var logger *logrus.Logger
+var version string
 
 func main() {
 	logger = logrus.New()
@@ -19,7 +20,7 @@ func main() {
 
 	app := &cli.App{
 		Name:      "CrossAsia warehouse client service",
-		Version:   "v0.1",
+		Version:   version,
 		Writer:    os.Stderr,
 		ErrWriter: os.Stderr,
 		Before: func(context *cli.Context) error {

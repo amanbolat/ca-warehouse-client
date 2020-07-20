@@ -1,0 +1,31 @@
+before:
+  hooks:
+    - go mod download
+builds:
+  -
+    env:
+      - CGO_ENABLED=0
+    main: ./cmd/main.go
+    binary: whclient
+    ldflags:
+      - -s -w -X main.build={{.Version}}
+    goos:
+      - darwin
+    goarch:
+      - amd64
+
+archives:
+  - replacements:
+      darwin: Darwin
+      linux: Linux
+      amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-{{ .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'

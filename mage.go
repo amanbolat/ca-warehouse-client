@@ -7,6 +7,7 @@ import (
 	"github.com/magefile/mage/sh"
 	"gopkg.in/errgo.v2/errors"
 	"strings"
+	"time"
 )
 
 const repoName = "ca-warehouse-client"
@@ -61,6 +62,26 @@ func BuildImage() error {
 	}
 
 	return sh.RunV("docker", "push", taggedRegistryRepoName)
+}
+
+func TagPush() error {
+	out, _ := sh.Output("git", "status", "-s")
+	if strings.TrimSpace(out) != "" {
+		return errors.New("Some files are not committed, can't build docker image")
+	}
+
+	version := fmt.Sprintf("%d.%d%d.%d", time.Now().Year(), time.Now().Month(), time.Now().YearDay(), time.Now().Unix())
+	err := sh.RunV("git", "tag", "-a", version)
+	if err != nil {
+		return err
+	}
+
+	err = sh.RunV("git", "push", version)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func GitStatus() error {
