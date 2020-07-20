@@ -76,7 +76,7 @@ func TagPush() error {
 	}
 
 	version := fmt.Sprintf("%d.%d%d.%d", time.Now().Year(), time.Now().Month(), time.Now().YearDay(), time.Now().Unix())
-	err := sh.RunV("git", "tag", "-a", version, "-m", commitMsg)
+	err = sh.RunV("git", "tag", "-a", version, "-m", commitMsg)
 	if err != nil {
 		return err
 	}
