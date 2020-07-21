@@ -6,12 +6,14 @@ import (
 	"github.com/amanbolat/ca-warehouse-client/api"
 	"github.com/amanbolat/ca-warehouse-client/config"
 	"github.com/amanbolat/ca-warehouse-client/filemaker"
+	"github.com/amanbolat/ca-warehouse-client/logistics"
 	"github.com/amanbolat/ca-warehouse-client/printing"
 	"github.com/amanbolat/gofmcon"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
+	bolt "go.etcd.io/bbolt"
 	"gopkg.in/olahol/melody.v1"
 	"log"
 	"net/http"
@@ -22,37 +24,60 @@ import (
 )
 
 type Server struct {
-	router        *echo.Echo
-	memCache      *cache.Cache
-	logger        *logrus.Logger
-	wsServer      *melody.Melody
-	wsSessions    *sync.Map
-	shipmentStore *filemaker.ShipmentStore
+	router            *echo.Echo
+	memCache          *cache.Cache
+	logger            *logrus.Logger
+	wsServer          *melody.Melody
+	wsSessions        *sync.Map
+	shipmentStore     *filemaker.ShipmentStore
+	boltDB            *bolt.DB
+	printer           *printing.Printer
+	labelManger       *printing.LabelManager
+	shipmentsForPrint chan []logistics.Shipment
 }
 
-func NewServer(config config.Config, logger *logrus.Logger) Server {
+func NewServer(config config.Config, logger *logrus.Logger) (*Server, error) {
 	conn := gofmcon.NewFMConnector(config.FmHost, "", config.FmUser, config.FmPass)
 	entryStore := filemaker.NewEntryStore(conn, config.FmDatabaseName)
 	entryStore.FMConn().SetDebug(config.Debug)
 	shipmentStore := filemaker.NewShipmentStore(conn, config.FmDatabaseName)
 	customerStore := filemaker.NewCustomerStore(conn, config.FmDatabaseName)
-
-	s := Server{
-		memCache:      cache.New(time.Hour*24, time.Hour*30),
-		logger:        logger,
-		wsServer:      melody.New(),
-		wsSessions:    &sync.Map{},
-		shipmentStore: shipmentStore,
+	boltDB, err := bolt.Open(config.BoltDbPath, 0600, nil)
+	if err != nil {
+		return nil, err
 	}
 
-	e := echo.New()
-	if config.Debug {
-		e.Debug = true
+	err = boltDB.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists(ShipmentsBucket)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	lm, err := printing.NewLabelManger(config.FontPath)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	s := Server{
+		memCache:          cache.New(time.Hour*24, time.Hour*30),
+		logger:            logger,
+		wsServer:          melody.New(),
+		wsSessions:        &sync.Map{},
+		shipmentStore:     shipmentStore,
+		boltDB:            boltDB,
+		printer:           &printing.Printer{Name: config.Printer},
+		labelManger:       &lm,
+		shipmentsForPrint: make(chan []logistics.Shipment, 20),
+	}
+
+	e := echo.New()
+	if config.Debug {
+		e.Debug = true
 	}
 
 	var a = API{
@@ -108,11 +133,13 @@ func NewServer(config config.Config, logger *logrus.Logger) Server {
 	s.router = e
 	s.SetupWsServer()
 	s.StartShipmentUpdates()
+	s.PrintShipmentPrepLabelsOnUpdate()
 
-	return s
+	return &s, nil
 }
 
 func (s Server) Start(port int) {
+	defer s.boltDB.Close()
 	go func() {
 		if err := s.router.Start(fmt.Sprintf(":%d", port)); err != nil {
 			s.router.Logger.Fatalf("failed to start server: %s", err.Error())

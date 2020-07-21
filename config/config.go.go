@@ -12,5 +12,6 @@ type Config struct {
 	Debug          bool
 	Port           int    `split_words:"true" required:"true"`
 	FontPath       string `split_words:"true" required:"true"`
+	BoltDbPath     string `split_words:"true" required:"true"`
 	api.KDNiaoConfig
 }
