@@ -65,6 +65,7 @@ func (s *Server) PrintShipmentPrepLabelsOnUpdate() {
 					s.logger.Debugf("preparation label for %s will be printed", code)
 					sm, err := s.shipmentStore.GetShipmentByCode(code)
 					if err != nil {
+						s.logger.Errorf("failed to print prep labels, %v", err)
 						continue
 					}
 
@@ -72,11 +73,13 @@ func (s *Server) PrintShipmentPrepLabelsOnUpdate() {
 
 						label, err := s.labelManger.CreateShipmentPreparationLabels(sm)
 						if err != nil {
+							s.logger.Errorf("failed to print prep labels, %v", err)
 							continue
 						}
 
 						err = s.printer.PrintFiles(1, "", label.FullPath)
 						if err != nil {
+							s.logger.Errorf("failed to print prep labels, %v", err)
 							continue
 						}
 						s.logger.Infof("printing %s shipment preparation label", sm.Code)
