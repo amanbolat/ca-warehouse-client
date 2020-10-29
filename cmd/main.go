@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"github.com/amanbolat/ca-warehouse-client/common"
 	"github.com/amanbolat/ca-warehouse-client/config"
 	"github.com/amanbolat/ca-warehouse-client/server"
 	"github.com/joho/godotenv"
@@ -12,15 +14,17 @@ import (
 
 var conf config.Config
 var logger *logrus.Logger
-var version string
+
+// var version string
 
 func main() {
 	logger = logrus.New()
 	logger.SetFormatter(&logrus.TextFormatter{})
+	fmt.Println("VERSION:", common.Version)
 
 	app := &cli.App{
-		Name:      "CrossAsia warehouse client service",
-		Version:   version,
+		Name:      fmt.Sprintf("CrossAsia warehouse client service [%s]", common.Version),
+		Version:   common.Version,
 		Writer:    os.Stderr,
 		ErrWriter: os.Stderr,
 		Before: func(context *cli.Context) error {
@@ -44,6 +48,13 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
+			{
+				Name: "version",
+				Action: func(context *cli.Context) error {
+					cli.ShowVersion(context)
+					return nil
+				},
+			},
 			{
 				Name:  "run",
 				Usage: "run warehouse client",

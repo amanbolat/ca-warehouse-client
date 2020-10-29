@@ -10,11 +10,15 @@ import (
 	"time"
 )
 
-const repoName = "ca-warehouse-client"
-const dockerRegistryName = "087613087242.dkr.ecr.us-west-2.amazonaws.com/ca-warehouse-client"
+const packageName = "github.com/amanbolat/ca-warehouse-client"
 
 func Mod() error {
-	return sh.RunV("go", "mod", "download")
+	err := sh.RunV("go", "mod", "download")
+	if err != nil {
+		return err
+	}
+
+	return sh.RunV("go", "mod", "tidy")
 }
 
 func Generate() error {
@@ -34,10 +38,19 @@ func ClearDist() error {
 
 func Build() error {
 	ClearDist()
-	return sh.RunV("go", "build", "-ldflags", "-X main.GitCommit=$GIT_COMMIT", "-s -w", "-o", "./dist/whclient", "./cmd/main.go")
+	tag, _ := sh.Output("git", "describe", "--tags", "--abbrev=0")
+	return sh.RunV("go", "build", "-ldflags", "-s -w -X '"+packageName+"/common.Version="+tag+"'", "-o", "./dist/whclient", "./cmd/main.go")
 }
 
 func TagPush() error {
+	err := Mod()
+	if err != nil {
+		return err
+	}
+	err = Generate()
+	if err != nil {
+		return err
+	}
 	out, _ := sh.Output("git", "status", "-s")
 	if strings.TrimSpace(out) != "" {
 		return errors.New("Some files are not committed, can't build docker image")

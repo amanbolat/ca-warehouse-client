@@ -6,7 +6,6 @@ require (
 	github.com/amanbolat/gofmcon v0.3.4
 	github.com/boombuler/barcode v1.0.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
-	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/fogleman/gg v1.3.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/gorilla/schema v1.1.0
@@ -28,6 +27,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
 	golang.org/x/image v0.0.0-20200618115811-c13761719519 // indirect
 	golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae // indirect
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/errgo.v2 v2.1.0
 	gopkg.in/olahol/melody.v1 v1.0.0-20170518105555-d52139073376
 )
