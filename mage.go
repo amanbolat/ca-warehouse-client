@@ -34,34 +34,7 @@ func ClearDist() error {
 
 func Build() error {
 	ClearDist()
-	return sh.RunV("go", "build", "-ldflags", "-s -w", "-o", "./dist/whclient", "./cmd/main.go")
-}
-
-func BuildImage() error {
-	out, _ := sh.Output("git", "status", "-s")
-	if strings.TrimSpace(out) != "" {
-		return errors.New("Some files are not committed, can't build docker image")
-	}
-
-	gitTag, err := sh.Output("git", "rev-parse", "--short", "HEAD")
-	if err != nil {
-		return err
-	}
-
-	taggedRepoName := fmt.Sprintf("%s:%s", repoName, gitTag)
-
-	err = sh.RunV("docker", "build", "-t", taggedRepoName, ".")
-	if err != nil {
-		return err
-	}
-
-	taggedRegistryRepoName := fmt.Sprintf("%s:%s", dockerRegistryName, gitTag)
-	err = sh.RunV("docker", "tag", taggedRepoName, taggedRegistryRepoName)
-	if err != nil {
-		return err
-	}
-
-	return sh.RunV("docker", "push", taggedRegistryRepoName)
+	return sh.RunV("go", "build", "-ldflags", "-X main.GitCommit=$GIT_COMMIT", "-s -w", "-o", "./dist/whclient", "./cmd/main.go")
 }
 
 func TagPush() error {
@@ -92,6 +65,13 @@ func TagPush() error {
 func GitStatus() error {
 	out, _ := sh.Output("git", "status", "-s")
 	fmt.Printf("[%v]", strings.TrimSpace(out))
+
+	return nil
+}
+
+func LatestTag() error {
+	out, _ := sh.Output("git", "describe", "--tags", "--abbrev=0")
+	fmt.Printf("%v", strings.TrimSpace(out))
 
 	return nil
 }

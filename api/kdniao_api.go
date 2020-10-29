@@ -17,6 +17,8 @@ type KDNiaoConfig struct {
 	KdnApiSecret  string `split_words:"true" required:"true"`
 }
 
+// KDNNiaoApi provides some methods to get parcel info from
+// 快递鸟
 type KDNiaoApi struct {
 	KDNiaoConfig
 	httpC *http.Client
@@ -31,7 +33,7 @@ func NewKDNiaoApi(config KDNiaoConfig) *KDNiaoApi {
 	}
 }
 
-// Hashed api secret and data to be used as authentication token
+// SignedRequest returns hashed API secret and data to be used as authentication token
 func (kd KDNiaoApi) SignedRequest(req []byte) string {
 	str := string(req) + kd.KdnApiSecret
 	hash := md5.Sum([]byte(str))
@@ -40,6 +42,7 @@ func (kd KDNiaoApi) SignedRequest(req []byte) string {
 	return signedData
 }
 
+// GetSourceByTrack fetches information of the parcel by its code
 func (kd KDNiaoApi) GetSourceByTrack(code string) (*SourceResponse, error) {
 	reqData := map[string]string{
 		"LogisticCode": code,

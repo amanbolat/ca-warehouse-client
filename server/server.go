@@ -139,7 +139,9 @@ func NewServer(config config.Config, logger *logrus.Logger) (*Server, error) {
 }
 
 func (s Server) Start(port int) {
-	defer s.boltDB.Close()
+	defer func() {
+		_ = s.boltDB.Close()
+	}()
 	go func() {
 		if err := s.router.Start(fmt.Sprintf(":%d", port)); err != nil {
 			s.router.Logger.Fatalf("failed to start server: %s", err.Error())

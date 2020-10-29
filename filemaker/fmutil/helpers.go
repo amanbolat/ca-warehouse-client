@@ -9,9 +9,8 @@ import (
 )
 
 const (
-	SCRIPT_AUDIT_LOG    = "api_audit_log"
-	SCRIPT_DELIMITER    = "|"
-	COMMON_QUERY_LAYOUT = "common_query_layout"
+	SCRIPT_AUDIT_LOG = "api_audit_log"
+	SCRIPT_DELIMITER = "|"
 )
 
 func validatePagination(q *fm.FMQuery, rm api.RequestMeta) {
@@ -21,7 +20,7 @@ func validatePagination(q *fm.FMQuery, rm api.RequestMeta) {
 	}
 }
 
-// withAudit adds script and params for audit log
+// WithAudit adds script and params for audit log
 func WithAudit(q *fm.FMQuery, id, table, field, data, user string) {
 	q.WithPostFindScript(SCRIPT_AUDIT_LOG, strings.Join([]string{id, table, field, data, user}, SCRIPT_DELIMITER))
 }

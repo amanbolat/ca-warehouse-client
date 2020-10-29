@@ -8,7 +8,7 @@ builds:
     main: ./cmd/main.go
     binary: whclient
     ldflags:
-      - -s -w -X main.build={{.Version}}
+      - -s -w -X main.version={{.Tag}}
     goos:
       - darwin
     goarch:
