@@ -47,10 +47,6 @@ func TagPush() error {
 	if err != nil {
 		return err
 	}
-	err = Generate()
-	if err != nil {
-		return err
-	}
 	out, _ := sh.Output("git", "status", "-s")
 	if strings.TrimSpace(out) != "" {
 		return errors.New("Some files are not committed, can't build docker image")
