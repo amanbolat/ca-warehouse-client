@@ -1,5 +1,3 @@
-//go:generate gomodifytags -file $GOFILE -struct Entry -add-tags json -w  -add-options
-
 package warehouse
 
 import (
