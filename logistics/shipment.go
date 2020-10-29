@@ -1,9 +1,6 @@
 //go:generate enumer -type=ShipmentStatus -json -sql -transform=snake
 //go:generate enumer -type=ShipmentType -json -sql -transform=snake
 //go:generate enumer -type=TransportMethod -json -sql -transform=snake
-//go:generate enumer -type=PackageMethod -json -sql -transform=snake
-//go:generate gomodifytags -file $GOFILE -struct Shipment -add-tags json -w
-//go:generate gomodifytags -file $GOFILE -struct jsonShipment -add-tags json -w
 
 package logistics
 
